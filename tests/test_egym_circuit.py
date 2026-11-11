@@ -10,6 +10,7 @@ other".
 """
 from __future__ import annotations
 
+import pathlib
 import re
 from datetime import date
 
@@ -52,9 +53,10 @@ def test_the_entries_are_fresh_copies():
 
 
 def test_every_name_says_egym_and_stays_apart_from_the_blocks_machines():
-    """"No, they're all different machines, so keep them apart": own names, own history."""
+    """"No, they're all different machines, so keep them apart": own names, own
+    history. Session D runs them from week 4, under their own names."""
     import goal_block as gb
-    block = {ex["name"] for day in gb.PLAN_GOAL_BLOCK.values() for ex in day.get("exercises") or []}
+    block = {ex["name"] for day in gb.SESSIONS.values() for ex in day}
     for name in ec.names():
         assert name.startswith("EGYM ") and name not in block, name
 
@@ -89,12 +91,28 @@ def test_every_name_is_in_the_three_maps(name):
 
 
 def test_every_exercise_has_a_complete_workflow_record():
-    """Key Rule 25: no exercise without its goal, reason, source and check."""
-    assert set(ec.EGYM_PICKS) == set(ec.names())
-    for name, p in ec.EGYM_PICKS.items():
-        assert p.goal == "egym" and p.area and p.job and p.reason, name
-        assert re.search(r"20\d\d-\d\d-\d\d", p.source), name
+    """Key Rule 25: no exercise without its goal, reason, source and check. The
+    records live in goal_week.PICKS beside the block's own, because from week 4
+    the machines are session D of the block (2026-11-11); each goal is the goal
+    of the block's exercise of the same kind."""
+    import goal_week as gw
+    for name in ec.names():
+        p = gw.pick_for(name)
+        assert p is not None, name
+        assert {g.strip() for g in p.goal.split(",")} <= {"A", "B", "C", "D"}, (name, p.goal)
+        assert p.area and p.job and p.reason, name
+        assert "Training day D" in p.source and re.search(r"20\d\d-\d\d-\d\d", p.source), name
         assert p.better and p.better.startswith("checked 20"), name
+    assert gw.pick_for("EGYM Squat").goal == gw.pick_for("Hack Squat").goal
+    assert gw.pick_for("EGYM Chest Press").goal == gw.pick_for("Machine Chest Press").goal
+    assert gw.pick_for("EGYM Hip Adductor").goal == gw.pick_for("Adductor Machine (Seated)").goal
+
+
+def test_the_content_file_imports_nothing_from_goal_week():
+    """goal_block imports egym_circuit, and goal_week's own imports reach
+    goal_block: an import of goal_week here would make a cycle."""
+    text = (pathlib.Path(ec.__file__)).read_text(encoding="utf-8")
+    assert "goal_week" not in "\n".join(l for l in text.splitlines() if l.startswith(("import", "from")))
 
 
 @pytest.mark.parametrize("name", ec.names())
@@ -130,7 +148,9 @@ def test_any_machine_may_run_next():
 
 
 def test_the_label_under_each_machine():
-    assert egs.prescription() == "2 sets, one after the other"
+    """No reps or rest named: EGYM sets them (sessions.prescription_label)."""
+    from services import sessions as sess
+    assert sess.prescription_label(ec.entries()[0]) == "2 sets, one after the other"
 
 
 def test_the_session_models_at_about_seventy_minutes():
@@ -158,6 +178,10 @@ def test_the_last_session_gives_each_machine_its_tonnage_set_by_set():
     ]
     last = egs.last_tonnage(rows, date(2026, 11, 10))
     assert last == {"EGYM Squat": [1240.0, 1300.0]}, "a skipped machine has no line"
+    # Session D of the block stores the machines as a plan session: read by name.
+    d_day = _row("EGYM Squat", "2026-11-13", [(1400, "2026-11-13T08:00:00+01:00")],
+                 session="2026-11-13-d", kind="Squat Pattern")
+    assert egs.last_tonnage(rows + [d_day], date(2026, 11, 13)) == {"EGYM Squat": [1400.0]}
     assert egs.last_tonnage(rows, date(2026, 11, 5)) == {"EGYM Squat": [900.0]}
     assert egs.last_tonnage([], date(2026, 11, 5)) == {}
 

@@ -201,7 +201,7 @@ def build_egym() -> dict:
     out = []
     for i, ex in enumerate(exercises):
         row = ts.exercise_out(ex, i, None, None, (None, None), False, moves[i])
-        out.append({**row, "prescription": egs.prescription(), "reps_editable": False,
+        out.append({**row, "reps_editable": False,
                     "previous_caption": egs.tonnage_caption([1240.0, 1300.0]) if i == 0 else "",
                     "estimated_minutes": 2})
     plan = {

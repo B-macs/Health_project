@@ -224,6 +224,13 @@ def _flexibility_test_names() -> tuple[str, ...]:
     return tuple(f"Flexibility Test: {cab.TESTS[k].label} (Test)" for k in cab.AVAILABLE_TESTS)
 
 
+_EGYM_SOURCE = ("his words, 2026-11-08: 'Above are the EGYM Machines, in my gym, I want to be "
+                "able to do a egym circuit at any time in training'; 'I will have to do both "
+                "sets just after each other'; 2026-11-11: 'Can we make this training Training "
+                "day D'")
+_EGYM_BETTER = ("checked 2026-11-08: the session is his gym's EGYM line, so a better exercise "
+                "can only be another EGYM machine; he named all fourteen")
+
 PICKS: dict[str, Pick] = {
     "Standing Psoas March": Pick(
         "warm-up", "hip flexors", "warm-up",
@@ -428,6 +435,28 @@ PICKS: dict[str, Pick] = {
            "Tailor's pose, unloaded", "Frog rocks", "Butterfly PIR",
            "90/90 hip rotations with lift-offs", "Triangle side split, external-rotation cue"),
            start=1)},
+    # The EGYM session (2026-11-08), session D of the block from week 4 (his words,
+    # 2026-11-11: "Can we make this training Training day D", then "Yes, build it").
+    # Each machine's goal is the goal of the block's exercise of the same kind.
+    **{name: Pick(goal, area, "two sets back to back, EGYM Auto mode", reason, _EGYM_SOURCE,
+                  better=_EGYM_BETTER)
+       for name, goal, area, reason in (
+           ("EGYM Squat", "A", "quads and glutes", "The session's biggest lift, first."),
+           ("EGYM Lat Pulldown", "A, B", "back", "The session's vertical pull."),
+           ("EGYM Leg Curl", "A", "hamstrings", "The knee bend for the back of the thigh."),
+           ("EGYM Chest Press", "A, B", "chest", "The session's horizontal press."),
+           ("EGYM Leg Press", "A", "quads and glutes", "The second leg press pattern."),
+           ("EGYM Row", "A, B", "back", "The session's horizontal pull."),
+           ("EGYM Glute Press", "A", "glute max", "The session's hip extension."),
+           ("EGYM Triceps Dip", "B", "press muscles",
+            "The arm press; he keeps it (answer 4, 2026-11-08)."),
+           ("EGYM Leg Extension", "A", "quads", "The session's knee straightening."),
+           ("EGYM Biceps Curl", "D", "arms", "The arm curl, for carrying strength."),
+           ("EGYM Hip Abductor", "A", "glute med", "The session's hip opening."),
+           ("EGYM Hip Adductor", "C", "adductors", "The session's hip closing."),
+           ("EGYM Back Extension", "A", "deep back", "The session's back extension."),
+           ("EGYM Abdominal Crunch", "A", "abs", "The session's trunk curl, last."),
+       )},
 }
 
 #: The picks whose check is not closed. Step 8 checked all eight on 2026-10-16

@@ -55,6 +55,7 @@ from datetime import date
 import cluster_a_battery as _battery
 import cluster_a_mechanics as _mech
 import cluster_a_prescription as _rx
+import egym_circuit as _egym
 from training_plan import _ex
 
 BLOCK_NAME = "12-Week Block — Hips, Back and Strength"
@@ -747,6 +748,21 @@ SESSIONS: dict[str, list[dict]] = {
 }
 #: The core sessions meet the weekly dose; D is the bonus.
 CORE_LETTERS = ("A", "B", "C")
+
+#: From this week of the block, session D is the EGYM session: his gym's
+#: fourteen EGYM machines, two sets one after the other on each, the tonnage of
+#: each set typed from the machine (egym_circuit.py). His words, 2026-11-11:
+#: "Can we make this training Training day D", and to the four questions, "Yes,
+#: build it": D every Friday from Friday 13 November (week 4) to the end of the
+#: block; the rear delts keep Monday's crossover only, 3 of their 4 weekly sets
+#: (the muscle balance reads the rear shoulder 4.8 times as strong as the front,
+#: WP-44); 2 sets a machine, the one named exception to the 3-set rule (3 sets
+#: would model at about 97 minutes); and the "+" menu keeps the EGYM session as
+#: an extra on other days. The block's placed week (goal_week.week()) and
+#: SESSIONS["D"] are unchanged, so weeks 1-3 keep the D he ran. A, B and C meet
+#: the weekly dose as before, gate 1 counts them only, and the hack squat keeps
+#: its progression on B.
+EGYM_D_FROM_WEEK = 4
 #: Weekday (Monday = 0) → session letter.
 LETTER_BY_WEEKDAY = {0: "A", 1: "B", 3: "C", 4: "D"}
 REST_WEEKDAYS = (2, 5)
@@ -930,6 +946,9 @@ def _with_plank_test(exercises: list[dict]) -> list[dict]:
 def _strength_day(letter: str, week: int) -> dict:
     exercises = list(SESSIONS[letter])
     objective = f"Session {letter} — Full Body (week {week})"
+    if letter == "D" and week >= EGYM_D_FROM_WEEK:
+        exercises = _egym.entries()
+        objective = f"Session D — EGYM (week {week})"
     if letter == "A" and week in TEST_WEEKS:
         exercises = _with_plank_test(exercises)
         objective = f"Session A — Full Body + Timed Plank Test (week {week})"

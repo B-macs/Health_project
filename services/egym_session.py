@@ -16,6 +16,11 @@ never marks a plan day done (his answer 1, 2026-11-08: "No, it's extra"), and a
 logged day like any other session (his answer 2: "Yes, it does"), so it counts
 toward the failed-week rule. It counts in strain and the load ratio.
 
+SESSION D OF THE BLOCK (2026-11-11): from week 4 the same machines are the
+12-week block's Friday session D (goal_block.EGYM_D_FROM_WEEK), run as a plan
+session through the same rules here (training_session.compose: a day whose
+every entry is an EGYM machine).
+
 THE ORDER ("I should be presented a order but I can change it up as I please"):
 every machine is a move group of its own, and any machine may run before any
 other. Both sets of a machine run one after the other ("I will have to do both
@@ -70,13 +75,16 @@ def modelled_minutes(exercises: list[dict]) -> int:
 
 
 def last_tonnage(rows: list[dict], today: date) -> dict[str, list[float]]:
-    """The newest EGYM session on or before `today`: each machine's tonnage,
-    set by set in the order the sets were done (each stored set is one rep at
-    its tonnage, egym_circuit.py). `rows` is Repository.get_all_training_
-    exercises_raw()'s shape. {} when none is stored."""
+    """The newest session with an EGYM machine in it, on or before `today`:
+    each machine's tonnage, set by set in the order the sets were done (each
+    stored set is one rep at its tonnage, egym_circuit.py). Read by the
+    machines' names, not the stored Type: the "+" menu's session is stored as
+    "EGYM", session D of the block (goal_block.EGYM_D_FROM_WEEK) as a plan
+    session. `rows` is Repository.get_all_training_exercises_raw()'s shape. {}
+    when none is stored."""
     sessions: dict[str, list[dict]] = {}
     for row in rows:
-        if row.get("movement_type") != EGYM_TYPE:
+        if row.get("movement_name") not in ec.TONNAGE_ONLY:
             continue
         day = str(row.get("session_date") or "")[:10]
         if not day or day > today.isoformat():
@@ -104,6 +112,3 @@ def tonnage_caption(values: list[float] | None) -> str:
         return ""
     return "Last time " + " and ".join(f"{round(v):,} kg" for v in values)
 
-
-def prescription() -> str:
-    return f"{ec.SETS} sets, one after the other"

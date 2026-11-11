@@ -230,6 +230,9 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
   // The EGYM session (2026-11-08): extra to the plan day, so it never marks the day trained.
   const egym = s.plan.kind === 'egym'
   const extra = accessory || daily || egym
+  // The EGYM machines' tonnage list: the "+" menu's session, and session D of the block from
+  // week 4 (2026-11-11), which is a plan session and marks the day trained.
+  const tonnage = s.plan.exercises.some((e) => e.tonnage_entry)
   // The slider starts at 5, and on the accessory and daily sessions at their own effort target.
   const [rpe, setRpe] = useState(extra ? (s.plan.rpe_target ?? 3) : 5)
   const [choice, setChoice] = useState<'plan' | 'clock'>(ask ? 'plan' : 'clock')
@@ -307,7 +310,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
         <section className="card group" role="status" data-testid="save-state" data-state={saved}>
           <p>{saved === 'confirmed' ? S.session.saved : saved === 'refused' ? S.session.refused : S.session.savedPhone}</p>
         </section>
-        {egym && <TonnageReview s={s} />}
+        {tonnage && <TonnageReview s={s} />}
         <HeartRateMatch s={s} update={update} confirmed={saved === 'confirmed'} />
         {s.plan.next_day && <p className="caption">{S.session.tomorrow(s.plan.next_day.day_num, s.plan.next_day.objective)}</p>}
         <button className="btn btn--primary btn--wide" onClick={onDone}>{S.session.done}</button>
@@ -323,7 +326,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
         <div className="caption">{S.session.allDone(exerciseOrder(s).length)}</div>
       </header>
       {s.notice && <p className="note" role="status" data-testid="notice">{s.notice}</p>}
-      {egym ? <TonnageReview s={s} /> : <Review s={s} />}
+      {tonnage ? <TonnageReview s={s} /> : <Review s={s} />}
       <WatchCheck s={s} />
       <section className="card group">
         <label className="group">

@@ -51,14 +51,17 @@ THE THREE LAYERS, the "+" session's pattern (services/accessory.py):
         |
     services/training_session   HOW   — the same guided flow and save
 
-NOTHING IS COPIED (CLAUDE.md Key Rule 25): every entry is written here with its
-record in EGYM_PICKS. These are his gym's EGYM machines, apart from the block's
-machines of the same kind (his answer: "they're all different machines"), so
-every name starts with "EGYM" and keeps its own history.
+NOTHING IS COPIED (CLAUDE.md Key Rule 25): every entry is written here, and
+its record is in goal_week.PICKS, beside the block's own: from week 4 these
+machines are session D of the 12-week block (his words, 2026-11-11: "Can we
+make this training Training day D"; goal_block.EGYM_D_FROM_WEEK). These are his
+gym's EGYM machines, apart from the block's machines of the same kind (his
+answer: "they're all different machines"), so every name starts with "EGYM"
+and keeps its own history. This file imports nothing from goal_week:
+goal_block imports it, and goal_week's own imports reach goal_block.
 """
 from __future__ import annotations
 
-from goal_week import Pick
 from training_plan import _ex
 
 #: The session's name on the menu and the overview.
@@ -191,34 +194,3 @@ NOTE = (
     "mode: EGYM sets the weight and the reps. After each set, type the tonnage the screen "
     "shows. When a machine is in use, do another first."
 )
-
-
-# ─── The workflow record — no exercise enters by copying (Key Rule 25) ───────
-
-_SOURCE = ("his words, 2026-11-08: 'Above are the EGYM Machines, in my gym, I want to be able "
-           "to do a egym circuit at any time in training'; 'I will have to do both sets just "
-           "after each other'")
-_BETTER = ("checked 2026-11-08: the session is his gym's EGYM line, so a better exercise "
-           "can only be another EGYM machine; he named all fourteen")
-
-#: goal "egym": the extra full-body session on his gym's EGYM machines.
-EGYM_PICKS: dict[str, Pick] = {
-    ex["name"]: Pick("egym", area, "two sets back to back, Auto mode", reason, _SOURCE,
-                     better=_BETTER)
-    for ex, area, reason in (
-        (SQUAT, "quads and glutes", "His gym's EGYM squat; the session's biggest lift, first."),
-        (LAT_PULLDOWN, "lats", "The session's vertical pull."),
-        (LEG_CURL, "hamstrings", "The session's knee bend for the back of the thigh."),
-        (CHEST_PRESS, "chest", "The session's horizontal press."),
-        (LEG_PRESS, "quads and glutes", "The session's second leg press pattern."),
-        (ROW, "mid-back", "The session's horizontal pull."),
-        (GLUTE_PRESS, "glutes", "The session's hip extension."),
-        (TRICEPS_DIP, "triceps", "The session's arm press; he keeps it (answer 4, 2026-11-08)."),
-        (LEG_EXTENSION, "quads", "The session's knee straightening."),
-        (BICEPS_CURL, "biceps", "The session's arm curl."),
-        (HIP_ABDUCTOR, "outer hip", "The session's hip opening."),
-        (HIP_ADDUCTOR, "inner thigh", "The session's hip closing."),
-        (BACK_EXTENSION, "back extensors", "The session's back extension."),
-        (ABDOMINAL_CRUNCH, "abs", "The session's trunk curl, last."),
-    )
-}

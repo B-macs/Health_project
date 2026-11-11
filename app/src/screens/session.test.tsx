@@ -514,3 +514,29 @@ describe('the daily tendon session (WP-40)', () => {
     expect(fx.dailyPlan('2026-10-20', new Set(['daily_done'])).done_today).toBe(true)
   })
 })
+
+describe('session D of the block runs the EGYM machines (2026-11-11)', () => {
+  // "Can we make this training Training day D": from week 4 the plan session on a Friday is
+  // the EGYM session. The save screen lists each machine's tonnage, and as a plan session it
+  // congratulates and marks the day trained (it is not an extra).
+  it('shows the tonnage list, and the plan session\'s own words once saved', async () => {
+    const egym = (await import('../../dev/egym_fixture.json')).default as unknown as Plan
+    const dDay: Plan = { ...egym, kind: 'plan', day_num: 26, plan_days: 84, objective: 'Session D — EGYM (week 4)' }
+    let s = startSessionState(dDay, '2026-11-13-d0000001', dDay.exercises.map((_, i) => `ex-${i}`))
+    let t = T0
+    while (!finished(s)) {
+      const ex = s.plan.exercises[s.plan.steps[s.step].ex_idx]
+      if (s.plan.steps[s.step].phase !== 'resting') s = setSide(s, ex.index, 'right', { weight_kg: 500 })
+      s = advance(s, t)
+      t += 30_000
+    }
+    const unsaved = text(provide(<SessionSave s={{ ...s, saving: true }} update={() => undefined} onDone={() => undefined} />))
+    expect(unsaved).toContain(S.session.tonnageTitle)
+    expect(unsaved).toContain(S.session.tonnageSets(['500 kg', '500 kg']))
+    expect(unsaved).not.toContain(S.session.egymEffortHelp)
+    const saved = { ...s, saving: true, savedId: 'outbox-1', saved: { rpe: 7, minutes: 70, notes: '' } }
+    const done = text(provide(<SessionSave s={saved} update={() => undefined} onDone={() => undefined} />))
+    expect(done).toContain(S.session.congrats)
+    expect(done).not.toContain(S.session.egymLogged)
+  })
+})

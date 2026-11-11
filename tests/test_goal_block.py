@@ -214,11 +214,14 @@ def _training(day):
 
 
 def test_every_training_exercise_has_three_working_sets():
-    """L4 (2026-10-16): fewer exercises with 3 sets each."""
+    """L4 (2026-10-16): fewer exercises with 3 sets each. One named exception:
+    the EGYM machines of session D from week 4 run 2 sets one after the other
+    (his answer 3, 2026-11-11: 3 sets would model at about 97 minutes)."""
+    egym = set(gb._egym.names())
     for d, day in PLAN.items():
         if day["day_type"] == "main":
             for e in _training(day):
-                assert e["sets"] == 3, (d, e["name"])
+                assert e["sets"] == (2 if e["name"] in egym else 3), (d, e["name"])
 
 
 def test_every_loaded_lift_has_the_range_its_kind_takes():

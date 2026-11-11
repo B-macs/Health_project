@@ -440,6 +440,10 @@ def type_icon(ex: dict) -> str:
 
 def prescription_label(ex: dict) -> str:
     t = ex["type"]
+    if ex.get("tonnage_entry"):
+        # An EGYM machine (egym_circuit.py): EGYM sets the weight and the reps,
+        # and the app records each set's tonnage, so no reps or rest are named.
+        return f"{ex['sets']} sets, one after the other"
     if t == "hold":
         sides = " each side" if ex["laterality"] == "unilateral" else ""
         rng = (f" (range {ex['hold_min']}-{ex['hold_max']}s)"

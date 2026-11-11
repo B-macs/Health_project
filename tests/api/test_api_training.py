@@ -469,6 +469,42 @@ def test_a_saved_egym_session_stores_its_tonnage_and_is_a_logged_day_that_marks_
     assert again["exercises"][1]["previous_caption"] == ""
 
 
+def test_session_d_from_week_4_is_the_egym_session_and_its_save_marks_d_done(env, monkeypatch):
+    """The athlete, 2026-11-11: "Can we make this training Training day D". From
+    Friday 13 November (week 4) the plan session on a Friday is the EGYM session:
+    the same machines, the tonnage typed, the machines free to move, EGYM's own
+    time model; saved as the plan session, it marks D done, and the next session
+    reads its tonnage."""
+    import egym_circuit as ec
+    import goal_block as gbk
+    friday = MONDAY + timedelta(days=(gbk.EGYM_D_FROM_WEEK - 1) * 7 + 4)
+    assert friday == date(2026, 11, 13)
+    plan = env.ok(monkeypatch, "get", "/api/training/session", local=friday)
+    assert plan["kind"] == "plan" and plan["objective"] == "Session D — EGYM (week 4)"
+    assert [e["name"] for e in plan["exercises"]] == list(ec.names())
+    assert all(e["tonnage_entry"] and not e["reps_editable"] and e["entry"] is None
+               and e["prescription"] == "2 sets, one after the other" for e in plan["exercises"])
+    assert plan["exercises"][5]["move"] == {"group": 5, "movable": True, "after": []}
+    assert 65 <= plan["model_minutes"] <= 73 and plan["alternatives"] == []
+    squat = plan["exercises"][0]
+    body = {"session_id": f"{friday}-d0000001", "date": friday.isoformat(), "kind": "plan",
+            "duration_minutes": 70, "session_rpe": 7, "exercises": [
+                {"exercise_id": "ex-d-1", "exercise": squat, "raw_sets": [
+                    {"set_num": 1, "completed_at": f"{friday}T08:00:00+01:00",
+                     "right": {"reps": 1, "weight_kg": 1240, "seconds": None}},
+                    {"set_num": 2, "completed_at": f"{friday}T08:02:00+01:00",
+                     "right": {"reps": 1, "weight_kg": 1300, "seconds": None}}]}]}
+    env.ok(monkeypatch, "post", "/api/training/sessions", local=friday, body=body)
+    assert env.repo.has_logged_session(friday), "session D is done"
+    rows = [r for r in env.repo.get_all_training_exercises_raw()
+            if r["session_id"] == body["session_id"]]
+    assert rows[0]["movement_type"] != "EGYM" and rows[0]["total_volume_kg"] == 2540.0
+    r = env.call(monkeypatch, "get", "/api/training/session", local=friday)
+    assert r.status_code == 409 and r.json() == {"error": "already_logged"}
+    extra = env.ok(monkeypatch, "get", "/api/training/egym", local=friday)
+    assert extra["exercises"][0]["previous_caption"] == "Last time 1,240 kg and 1,300 kg"
+
+
 def test_completion_asks_the_length_when_the_clock_ran_far_past_the_plan(env, monkeypatch):
     body = {"model_minutes": 60, "start_ts": 1000.0, "end_ts": 1000.0 + 150 * 60, "rpe": 7}
     out = env.ok(monkeypatch, "post", "/api/training/completion", body=body)

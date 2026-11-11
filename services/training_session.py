@@ -167,13 +167,23 @@ def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tu
 
 
 def _egym_entries(repo, today: date, exercises: list[dict]) -> list[dict]:
-    """The EGYM session's machines as the phone shows them: two sets one after
-    the other, no reps stepper, and the last session's tonnage set by set."""
+    """The EGYM machines as the phone shows them, in the "+" menu's session and
+    in session D of the block: no reps stepper, and the last session's tonnage
+    set by set. Every other exercise is returned as it is."""
+    if not any(ex.get("tonnage_entry") for ex in exercises):
+        return exercises
     last = egs.last_tonnage(_try(repo.get_all_training_exercises_raw, []), today)
     minutes = max(1, round(egs.ec.SETS * egs.ec.SET_SECONDS / 60))
-    return [{**ex, "prescription": egs.prescription(), "reps_editable": False,
+    return [{**ex, "reps_editable": False,
              "previous_caption": egs.tonnage_caption(last.get(ex["name"])),
-             "estimated_minutes": minutes} for ex in exercises]
+             "estimated_minutes": minutes} if ex.get("tonnage_entry") else ex
+            for ex in exercises]
+
+
+def egym_day(exercises: list[dict]) -> bool:
+    """Every entry is an EGYM machine: the "+" menu's session, or session D of
+    the block from week 4 (goal_block.EGYM_D_FROM_WEEK)."""
+    return bool(exercises) and all(ex.get("tonnage_entry") for ex in exercises)
 
 
 def _seeder(repo, today: date, plan_ex: list[dict], dosed: list[dict], policy: dict,
@@ -269,25 +279,28 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
     first = sess.first_side(today)
     strains = _warning_strains(repo, today)
     garmin_ok = bool(_try(repo.garmin_configured, False))
-    # The EGYM session records a tonnage only: nothing of it is seeded (prescription.py).
-    seed_for = ((lambda _i: None) if kind == EGYM
-                else _seeder(repo, today, plan_ex, dosed, policy, modifier))
+    # An EGYM machine records a tonnage only: nothing of it is seeded (prescription.py).
+    seeder = _seeder(repo, today, plan_ex, dosed, policy, modifier)
+
+    def seed_for(i: int):
+        return None if dosed[i].get("tonnage_entry") else seeder(i)
 
     # The accessory session moves nothing: its items are not the block's cards.
-    # The EGYM session moves every machine (egym_session.move_groups).
-    moves = (session_order.move_groups(dosed) if kind == PLAN
-             else egs.move_groups(dosed) if kind == EGYM else [None] * len(dosed))
+    # The EGYM machines move freely, in the "+" menu's session and in session D
+    # of the block (egym_session.move_groups).
+    egym = egym_day(dosed)
+    moves = (egs.move_groups(dosed) if egym
+             else session_order.move_groups(dosed) if kind == PLAN else [None] * len(dosed))
     readings = _readings(repo, today, dosed)
     exercises = [exercise_out(ex, i, seed_for(i), sess.ramp_lift_index(plan_ex, i), strains,
                               garmin_ok, moves[i], readings.get(i))
                  for i, ex in enumerate(dosed)]
-    if kind == EGYM:
-        exercises = _egym_entries(repo, today, exercises)
+    exercises = _egym_entries(repo, today, exercises)
     # The daily session has its own time model: it never leaves one room, so
     # the gym's measured changeovers do not apply (daily_session.modelled_seconds).
     # The EGYM session too: EGYM's own set length (egym_session.modelled_seconds).
     model_minutes = (dly.modelled_minutes(dosed) if kind == DAILY
-                     else egs.modelled_minutes(dosed) if kind == EGYM
+                     else egs.modelled_minutes(dosed) if egym
                      else sess.estimate_duration(dosed))
     alternatives = (_alternatives(repo, today, plan_ex, dosed, moves, first, strains, garmin_ok,
                                   policy, modifier, content.get("day_type"), settings,
