@@ -670,8 +670,9 @@ def test_a_lift_is_seeded_from_its_last_session_and_says_where_from(env, monkeyp
     assert press["entry"] is not None and press["previous"] is not None
     assert press["previous_caption"] and press["entry_caption"]
     assert press["entry"]["weight_kg"] is not None
-    # No check-in today: a weight step waits for one (Key Rule 23's pain gate).
-    assert press["entry"]["weight_kg"] <= 50.0
+    # Every set at the top of the range in both sessions: the weight steps, with
+    # no check-in today (the athlete, 2026-11-11: "remove it its not required").
+    assert press["entry"]["weight_kg"] == 52.5 and press["entry"]["action"] == "step_up"
 
 
 def test_a_ramp_set_proposes_from_the_lift_it_prepares(env, monkeypatch):

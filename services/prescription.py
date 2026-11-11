@@ -26,7 +26,9 @@ from datetime import date
 
 from services import sessions as sess
 
-#: Why a weight step waits when today's check-in could not be read.
+#: Why a weight step waits when the check-ins could not be read: a check-in
+#: with pain above 5/10 may be there. A day with NO check-in steps
+#: (sessions.step_block_reason, 2026-11-11).
 CHECK_IN_UNREAD = "today's check-in could not be read"
 
 

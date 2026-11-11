@@ -74,7 +74,8 @@ def _seed(repo, ex=LIFT, **kw):
 @pytest.mark.parametrize("check_ins, block", [
     ([{"date": "2026-10-20", "pain_score": 2}], None),
     ([{"date": "2026-10-20", "pain_score": 7}], "today's pain score is 7/10"),
-    ([{"date": "2026-10-19", "pain_score": 1}], "there is no check-in for today"),
+    ([{"date": "2026-10-19", "pain_score": 1}], None),     # no check-in today: it steps
+    ([], None),
 ])
 def test_a_loaded_lift_resolves_as_sessions_does_with_the_pain_gate(check_ins, block):
     repo = FakeRepo(check_ins)
@@ -84,7 +85,9 @@ def test_a_loaded_lift_resolves_as_sessions_does_with_the_pain_gate(check_ins, b
     assert seed.contradiction is None
 
 
-def test_an_unreadable_check_in_blocks_the_step_like_a_missing_one():
+def test_check_ins_that_cannot_be_read_still_hold_the_step():
+    # A missing check-in steps (2026-11-11), but a failed read may hide one
+    # with pain above 5/10.
     seed = _seed(FakeRepo(fail={"readiness"}))
     assert seed.entry == _expected(prescription.CHECK_IN_UNREAD)
 

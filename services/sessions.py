@@ -1121,16 +1121,18 @@ def step_block_reason(check_in: dict | None) -> str | None:
     """Why a weight step must wait today, in words for the screen, or None
     when it may go ahead.
 
-    ⚠ NO CHECK-IN BLOCKS, by the athlete's choice (2026-09-16), and a check-in
-    without a pain score blocks the same way: a measurement not taken is not
-    evidence of health. A step is one session's worth of progress and waiting
-    costs a week, while a step onto an unreported flare costs more.
+    Only a pain score above STEP_PAIN_CEILING on today's check-in holds a step.
+    A day with no check-in, or a check-in without a pain score, steps as usual
+    (the athlete, 2026-11-11: "remove it its not required"). From 2026-09-16 a
+    missing check-in held the step too, and his RDL stayed at 40 kg on 6 and 11
+    Nov after three sessions at 40 x 12: the phone builds the session before he
+    checks in, which he does after the gym.
     """
     if not check_in:
-        return "there is no check-in for today"
+        return None
     pain = check_in.get("pain_score")
     if pain is None or pain == "":
-        return "today's check-in has no pain score"
+        return None
     if float(pain) > STEP_PAIN_CEILING:
         return f"today's pain score is {float(pain):g}/10"
     return None
