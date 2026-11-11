@@ -71,12 +71,40 @@ def is_strength_day(day: dict | None) -> bool:
     return bool(day and day.get("is_gym_session"))
 
 
-def is_due(phases, today: date) -> bool:
-    """Today's scheduled plan day is a strength session and tomorrow's is not
+#: Evening sessions a week at most: the blueprint's limit, and his answer "Two
+#: evenings, no Sunday".
+WEEKLY_EVENINGS = 2
+
+
+def is_evening(phases, d: date) -> bool:
+    """`d`'s scheduled plan day is a strength session and the next day's is not
     (his rule, 2026-11-11). The schedule decides, not the log: a strength day
     not yet trained at the time of asking still has its evening."""
-    return (is_strength_day(scheduled_day(phases, today))
-            and not is_strength_day(scheduled_day(phases, today + timedelta(days=1))))
+    return (is_strength_day(scheduled_day(phases, d))
+            and not is_strength_day(scheduled_day(phases, d + timedelta(days=1))))
+
+
+def is_due(phases, today: date, done_on=()) -> bool:
+    """The evening session is due today.
+
+    A MOVE NEVER ADDS AN EVENING (the athlete, 2026-11-11: "when I move the
+    Friday training to Thursday the evening mobility if not performed goes to
+    Thursday"). The week owes WEEKLY_EVENINGS, or fewer when it has fewer
+    evenings, less the evening sessions done before today (`done_on`, the days
+    with one logged); the evenings it still owes are its last ones from today
+    on. So with Wednesday's evening done and Friday's C moved to Thursday, the
+    one still owed is Saturday's, and Thursday has none; with Wednesday's not
+    done, Thursday and Saturday both have one."""
+    if not is_evening(phases, today):
+        return False
+    monday = today - timedelta(days=today.weekday())
+    evenings = [d for d in (monday + timedelta(days=i) for i in range(7)) if is_evening(phases, d)]
+    done = sum(1 for d in set(done_on) if monday <= d < today)
+    owed = min(WEEKLY_EVENINGS, len(evenings)) - done
+    if owed <= 0:
+        return False
+    ahead = [d for d in evenings if d >= today]
+    return today in ahead[max(0, len(ahead) - owed):]
 
 
 def done_today(day_sessions: list[dict]) -> bool:

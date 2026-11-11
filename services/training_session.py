@@ -21,7 +21,7 @@ engine's own sync.
 from __future__ import annotations
 
 import threading
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from services import accessory as acc
 from services import daily_session as dly
@@ -440,7 +440,14 @@ def daily_plan(repo, today: date) -> dict:
     r = ts.read(repo, today)
     decided = ts.todays_decision(repo, r.phases, today)
     day_sessions = dly.read_day_sessions(repo, today)
-    if not r.phases_error and mob.is_due(r.phases, today):
+    # An evening done today stays on the tile, done, even when a move later
+    # takes today's evening away; an evening done earlier this week is not owed
+    # again (mobility_session.is_due, 2026-11-11).
+    monday = today - timedelta(days=today.weekday())
+    done_on = [d for d in (monday + timedelta(days=i) for i in range(today.weekday()))
+               if mob.done_today(dly.read_day_sessions(repo, d))]
+    if not r.phases_error and (mob.done_today(day_sessions)
+                               or mob.is_due(r.phases, today, done_on)):
         out = compose(repo, today, kind=MOBILITY, day_num=None, content=mob.build_day(),
                       decided=decided)
         out["next_day"] = None

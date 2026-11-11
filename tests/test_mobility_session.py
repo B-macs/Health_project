@@ -75,6 +75,42 @@ def test_the_evening_follows_the_sessions_when_they_move():
     assert due == [date(2026, 11, 11), date(2026, 11, 13)]
 
 
+# ─── A move never adds an evening (the athlete, 2026-11-11) ─────────────────
+
+#: Week 4 with Friday's C moved to Thursday: Wednesday B, Thursday C, Friday
+#: rest, Saturday D, Sunday rest.
+_C_ON_THURSDAY = {"2026-11-10": 23, "2026-11-11": 23, "2026-11-12": 25, "2026-11-13": 24,
+                  "2026-11-14": 26, "2026-11-15": 27}
+WED, THU, SAT = date(2026, 11, 11), date(2026, 11, 12), date(2026, 11, 14)
+
+
+def test_a_moved_evening_not_yet_done_goes_to_the_new_day():
+    """"when I move the Friday training to Thursday the evening mobility if
+    not performed goes to Thursday": Wednesday's evening not done, Thursday
+    and Saturday both have one."""
+    phases = _phases(**_C_ON_THURSDAY)
+    assert [d for d in _week(4) if mob.is_due(phases, d)] == [THU, SAT]
+    assert not mob.is_due(phases, WED), "Wednesday is no longer before a day off"
+
+
+def test_a_moved_evening_already_done_is_not_owed_again():
+    """Wednesday's evening done, then C moved to Thursday: the week still owes
+    one evening, Saturday's; Thursday has none."""
+    phases = _phases(**_C_ON_THURSDAY)
+    assert not mob.is_due(phases, THU, done_on=[WED])
+    assert mob.is_due(phases, SAT, done_on=[WED])
+    assert not mob.is_due(phases, SAT, done_on=[WED, THU]), "both evenings done"
+
+
+def test_a_done_evening_in_a_normal_week_leaves_the_second_one():
+    phases = _phases()
+    tuesday, friday = _week(5)[1], _week(5)[4]
+    assert mob.is_due(phases, friday, done_on=[tuesday])
+    assert mob.is_due(phases, friday, done_on=[]), "a missed Tuesday is not made up, nor taken away"
+    # A session done in another week does not count in this one.
+    assert mob.is_due(phases, friday, done_on=[_week(4)[4]])
+
+
 def test_a_forced_rest_has_no_evening_and_gives_one_to_the_day_before():
     phases = _phases(**{"2026-11-16": 0})              # Monday of week 5 forced rest
     assert not mob.is_due(phases, date(2026, 11, 16))
