@@ -1095,7 +1095,11 @@ number two is correct"*).
    start: set the weight you will lift today". The weighted hip airplane has
    its own name, "Hip Airplane (Weighted)", so it starts its own history.
 6. **In order** — a missed strength day moves the rest along, A, B, C, D, the
-   app asking first ("Run in order" / "Keep as planned").
+   app asking first ("Run in order" / "Keep as planned"). **From 2026-11-11
+   every later day of the week moves one day, rest days too, and the move
+   stops at Sunday** (his words: "Missed monday training becomes tuesday.
+   Tuesday becomes wednesday, Wednesday day off becomes thursday and so on");
+   before that, only the strength days moved and the last session was left out.
 7. **Gate 1** — on the training page: the one-tap reason for a week with
    fewer than 3 core sessions, the 6-week count, the four main lifts against
    10% above their first weight, and a way to record a flare-up in a full week.

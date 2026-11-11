@@ -121,7 +121,7 @@ def carry_proposal(repo, r: Reads) -> dict | None:
     """The missed-session carry for this week, or None (move TRN-6's reads).
 
     A block that runs its sessions in order (the 12-week block: A, B, C,
-    then D) moves the rest along after a missed day
+    then D) moves the rest of the week one day later after a missed day
     (scheduling.in_order_reschedules, its "done" a logged PLAN session, so a
     yoga day is not session A); any other block carries a missed session onto
     a later day of lower priority (scheduling.missed_reschedules). `moves`

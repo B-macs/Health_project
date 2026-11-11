@@ -56,6 +56,7 @@ handled and simply stays missed.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import replace
 from datetime import date, timedelta
 
@@ -110,8 +111,8 @@ LEFT_AS_MISSED = "left as missed by choice"
 def shift_note(shift_reasons: dict[str, str], day_iso: str, logged: bool) -> str | None:
     """DETERMINISTIC. The schedule note to show for a day, or None.
 
-    A note that the day's session was MISSED — not rescheduled, or left as
-    missed by choice — is not shown on a day that HAS a logged session: it can
+    A note that the day's session was MISSED — moved on, not rescheduled, or
+    left as missed by choice — is not shown on a day that HAS a logged session: it can
     only have been written while the app could not see that session. Found
     2026-10-09: a restart rebuilt the hosted app's data without three
     sessions, the app offered to move two of them, the athlete pressed "Leave
@@ -121,7 +122,7 @@ def shift_note(shift_reasons: dict[str, str], day_iso: str, logged: bool) -> str
     reason = shift_reasons.get(day_iso)
     if not reason:
         return None
-    missed = (reason.startswith(DROPPED_REASON_PREFIX)
+    missed = (reason.startswith((DROPPED_REASON_PREFIX, MISSED_MOVED_PREFIX))
               or reason == DECLINED_REASON_PREFIX + LEFT_AS_MISSED)
     return None if (logged and missed) else reason
 
@@ -629,16 +630,56 @@ def missed_reschedules(
 
 # ─── The 12-week block: the sessions run in order ───────────────────────────
 # The athlete, approved 2026-10-16: "The sessions run in order, A, B, C, then
-# D. A missed day moves the rest along; three sessions in a week meet the
-# dose." It replaces the priority carry above for a block whose strength days
-# carry a session letter: every strength day is "main", so the priority carry
-# could only move a missed session onto Wednesday's rest, which he had already
-# turned down (three strength days in a row). ASK-FIRST like every other move.
+# D." It replaces the priority carry above for a block whose strength days
+# carry a session letter. ASK-FIRST like every other move.
+#
+# THE WEEK MOVES ONE DAY (the athlete, 2026-11-11): "When I miss a monday
+# training, it should move all the training by 1 day. not replace anything,
+# Missed monday training becomes tuesday. Tuesday becomes wednesday, Wednesday
+# day off becomes thursday and so on." It replaces the first rule of
+# 2026-10-16, which moved only the strength days onto the week's other
+# strength days and left the last session (D) out of the week. The move stops
+# at the end of the week (his answer the same day: Key Rule 18b stands), so
+# the last day of the week falls off. From week 4 Sunday is a rest day (the
+# evening mobility change of the same day), so one or two missed days lose
+# nothing; a session falls off only when no rest day is left at the week's end.
+
+#: Reason-string prefix for a missed session that the one-day move put on a
+#: later day of its week. A missed day with this mark is not asked about again.
+MISSED_MOVED_PREFIX = "Missed: "
+
+#: The marks of a missed day that has its answer: moved on, not run this
+#: week, or a move he turned down.
+_ANSWERED_PREFIXES = (MISSED_MOVED_PREFIX, DROPPED_REASON_PREFIX, DECLINED_REASON_PREFIX)
+
 
 def runs_in_order(plan_dict: dict | None) -> bool:
     """DETERMINISTIC. Whether a block's strength days carry session letters
     (goal_block.py), so a missed day is handled by in_order_reschedules."""
     return any((content or {}).get("session_letter") for content in (plan_dict or {}).values())
+
+
+def _day_name(content: dict | None) -> str:
+    """A plan day in the prompt's words: its session letter, the flexibility
+    session, or a rest day."""
+    c = content or {}
+    if c.get("session_letter"):
+        return f"session {c['session_letter']}"
+    if day_type(c) in (None, "rest"):
+        return "rest day"
+    if c.get("session_kind") == "flexibility":
+        return "the flexibility session"
+    return "the session"
+
+
+def _capital(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
+def _week_in_phase(phase: Phase, today: date) -> list[date]:
+    monday = today - timedelta(days=today.weekday())
+    week = [monday + timedelta(days=i) for i in range(7)]
+    return [d for d in week if 1 <= plan.day_number_in_phase(phase, d) <= phase.length_days]
 
 
 def in_order_reschedules(
@@ -647,74 +688,102 @@ def in_order_reschedules(
     logged_dates: set[str],
     today: date,
 ) -> tuple[dict[str, int], dict[str, str]]:
-    """DETERMINISTIC. The (date_overrides, shift_reasons) deltas that run this
-    week's sessions in order after a missed strength day; both empty when
-    there is nothing to propose.
+    """DETERMINISTIC. The (date_overrides, shift_reasons) deltas that move this
+    week one day later for each missed strength day; both empty when there is
+    nothing to propose.
 
-    The week's strength days are its dates whose resolved plan day carries a
-    session letter. A letter is done when its day was logged (`logged_dates`
-    must be the PLAN-day set: a yoga session is not session A). The letters not
-    done, in order, go to the strength days from today on that are not logged;
-    the ones that do not fit fall onto the missed days, so the dropped session
-    reads as missed there (D first, being last). Nothing leaves the week (Key
-    Rule 18b), and nothing is proposed again once every missed day carries his
-    "left as missed" answer.
-    """
+    A missed day is a day before today whose plan day carries a session letter,
+    with no logged plan session (`logged_dates` must be the PLAN-day set: a yoga
+    session is not session A) and no answer yet. From the first missed day on,
+    the week's plan days, in the plan's order and rest days included, go one a
+    day onto the days from today that have no logged session. A plan day
+    already done this week, and a missed day already answered, do not run
+    again. What does not fit by Sunday does not run this week (Key Rule 18b).
+
+    Each missed day keeps its own plan day and records where that session now
+    runs (MISSED_MOVED_PREFIX), or that it does not run this week
+    (DROPPED_REASON_PREFIX), so it is not asked about again. "Keep as planned"
+    marks the missed days instead (declined_entries)."""
     if not plan_dict:
         return {}, {}
-    monday = today - timedelta(days=today.weekday())
-    week = [monday + timedelta(days=i) for i in range(7)]
-    week = [d for d in week if 1 <= plan.day_number_in_phase(phase, d) <= phase.length_days]
+    week = _week_in_phase(phase, today)
 
-    def letter(d: date) -> str | None:
-        return (plan_dict.get(plan.day_number_in_phase(phase, d)) or {}).get("session_letter")
+    def num(d: date) -> int:
+        return plan.day_number_in_phase(phase, d)
 
-    slots = [d for d in week if letter(d)]
-    if not slots:
+    def logged(d: date) -> bool:
+        return d.isoformat() in logged_dates
+
+    def answered(d: date) -> bool:
+        return phase.shift_reasons.get(d.isoformat(), "").startswith(_ANSWERED_PREFIXES)
+
+    missed = [d for d in week if d < today and not logged(d) and not answered(d)
+              and (plan_dict.get(num(d)) or {}).get("session_letter")]
+    if not missed:
         return {}, {}
-    num_of = {letter(d): plan.day_number_in_phase(phase, d) for d in slots}
-    logged = [d for d in slots if d.isoformat() in logged_dates]
-    missed = [d for d in slots if d < today and d.isoformat() not in logged_dates]
-    ahead = [d for d in slots if d >= today and d.isoformat() not in logged_dates]
-    fresh = [d for d in missed
-             if not phase.shift_reasons.get(d.isoformat(), "").startswith(DECLINED_REASON_PREFIX)]
-    if not fresh:
-        return {}, {}
-    done = {letter(d) for d in logged}
-    todo = [s for s in sorted(num_of) if s not in done]
-    assign = dict(zip(ahead, todo))
-    assign.update(zip(missed, todo[len(ahead):]))
+    done = {num(d) for d in week if logged(d)}
+    queue = sorted({num(d) for d in week
+                    if d >= missed[0] and not logged(d) and not (d < today and answered(d))}
+                   - done)
+    free = [d for d in week if d >= today and not logged(d)]
+    landing = dict(zip(free, queue))
 
     overrides: dict[str, int] = {}
     reasons: dict[str, str] = {}
-    for d, s in assign.items():
-        if num_of[s] == plan.day_number_in_phase(phase, d):
+    runs_on: dict[int, date] = {}
+    for d, n in landing.items():
+        runs_on[n] = d
+        if n == num(d):
             continue
-        iso = d.isoformat()
-        overrides[iso] = num_of[s]
-        if d < today:
-            reasons[iso] = (DROPPED_REASON_PREFIX
-                            + f"session {s} does not run this week (the sessions run in order)")
-        else:
-            reasons[iso] = f"Session {s} here: the sessions run in order after a missed day"
-    if not any(date.fromisoformat(iso) >= today for iso in overrides):
+        overrides[d.isoformat()] = n
+        name = _day_name(plan_dict.get(n))
+        if name != "rest day":
+            reasons[d.isoformat()] = f"{_capital(name)} here: the week moved one day after a missed day"
+    if not overrides:
         return {}, {}
+    for d in missed:
+        n = num(d)
+        overrides[d.isoformat()] = n
+        name = _day_name(plan_dict.get(n))
+        if n in runs_on:
+            reasons[d.isoformat()] = (f"{MISSED_MOVED_PREFIX}{name} runs on "
+                                      f"{runs_on[n].strftime('%A %d %b')}")
+        else:
+            reasons[d.isoformat()] = f"{DROPPED_REASON_PREFIX}{name} does not run this week"
     return overrides, reasons
+
+
+def _not_run(phase: Phase, plan_dict: dict, overrides: dict[str, int], today: date) -> list[str]:
+    """The sessions a proposal leaves out of the week: every session on the
+    days from today and on the missed days before it, less every session on
+    the days from today once the proposal is applied. Rest days are not
+    counted."""
+    week = _week_in_phase(phase, today)
+    moved = replace(phase, date_overrides={**phase.date_overrides, **overrides})
+
+    def names(ph: Phase, days: list[date]) -> Counter:
+        return Counter(name for d in days
+                       if (name := _day_name(plan_dict.get(plan.day_number_in_phase(ph, d))))
+                       != "rest day")
+
+    ahead = [d for d in week if d >= today]
+    missed = [date.fromisoformat(iso) for iso in overrides if date.fromisoformat(iso) < today]
+    return sorted((names(phase, ahead) + names(phase, missed) - names(moved, ahead)).elements())
 
 
 def in_order_summary(phase: Phase, plan_dict: dict, overrides: dict[str, int],
                      today: date) -> list[str]:
     """DETERMINISTIC. The proposal in plain lines, for the ask-first prompt:
-    which session runs on which day from today, and which does not run."""
+    what each day runs from today, then what does not run this week."""
     lines = []
     for iso in sorted(overrides):
         d = date.fromisoformat(iso)
-        s = (plan_dict.get(overrides[iso]) or {}).get("session_letter")
-        if d >= today:
-            when = "Today" if d == today else d.strftime("%A %d %b")
-            lines.append(f"{when}: session {s}")
-        else:
-            lines.append(f"Session {s} does not run this week")
+        if d < today:
+            continue
+        when = "Today" if d == today else d.strftime("%A %d %b")
+        lines.append(f"{when}: {_day_name(plan_dict.get(overrides[iso]))}")
+    lines += [f"{_capital(name)} does not run this week"
+              for name in _not_run(phase, plan_dict, overrides, today)]
     return lines
 
 

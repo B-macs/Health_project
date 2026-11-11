@@ -101,7 +101,8 @@ def test_a_missed_monday_run_in_order_still_reads_three_of_three():
     tuesday = _mon(1) + timedelta(days=1)
     ovr, rsn = sch.in_order_reschedules(PHASE, PLAN, set(), tuesday)
     moved = replace(PHASE, date_overrides=ovr, shift_reasons=rsn)
-    logged = {(_mon(1) + timedelta(days=i)).isoformat() for i in (1, 3, 4)}
+    # The week moved one day (2026-11-11): A Tuesday, B Wednesday, C Friday.
+    logged = {(_mon(1) + timedelta(days=i)).isoformat() for i in (1, 2, 4)}
     assert g.core_sessions_done(moved, PLAN, logged, _mon(1)) == 3
 
 
