@@ -753,7 +753,7 @@ export const S = {
     legDay: "Yesterday's session loaded your legs. A cold reading this morning will read tighter than your real baseline in exactly the areas being tested: measure after a legs-free day, or record today knowing it is not comparable with a clean morning.",
     threeNumbers: 'How to understand the three numbers',
     measureLine: (measure: string, short: string) => `**${measure}**: ${short}`,
-    order: 'Assisted work always comes after unassisted: the spectrum runs **active → isometric → passive**, and the tilt runs own power before helped. Help and passive work leave everything looser, so taking either first would flatter what follows it.',
+    order: 'Assisted work always comes after unassisted: the tests run **active → isometric → passive**, own power before help. Help and passive work leave everything looser, so taking either first would flatter what follows it.',
     lockTitle: 'What a LOCK is, and what to do if you lose it',
     onceTitle: 'Measure these once, then re-use them forever',
     onceWhy: 'Setup numbers, not scores. Get one wrong and two sessions are not comparable however carefully each was measured.',
@@ -761,7 +761,12 @@ export const S = {
     movingLine: (name: string, why: string) => `**${name}**: this one is meant to move. ${why}`,
     neverChase: 'Two things to record but never chase',
     nerveCheck: 'The nerve check',
-    innerKnee: 'Discomfort on the inside of the knee',
+    // The second note's heading, by the code the engine sends (guide.second_note): Cluster A's
+    // inside of the knee, the front split's front of the hip (2026-11-11).
+    secondNote: {
+      inner_knee: 'Discomfort on the inside of the knee',
+      front_hip: 'A sharp pinch at the front of a hip',
+    } as Record<string, string>,
     begin: 'Begin',
     cancel: 'Cancel',
     yourAnswer: 'That is your answer: stop here',

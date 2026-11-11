@@ -399,12 +399,16 @@ PICKS: dict[str, Pick] = {
                "Thomas-test position, where the right hip clicked; approved 2026-10-16 ('3 yes')"),
     "Adductor Machine (Seated)": Pick(
         "C", "adductors", "strength at length",
-        "The flexibility goal's blocker, the adductors with the knees bent (21.5 cm against "
-        "10 cm, 2026-08-12): strength from a wide start, in the tested position.",
-        "tier_lists/adductors.md #1, S (the decider's list); step 2, goal C",
+        "Adductor strength from a wide start protects the groin, and the front split, the "
+        "flexibility goal from 2026-11-11, stretches the groin. It was picked for the side "
+        "split's blocker, the adductors with the knees bent (21.5 cm against 10 cm, "
+        "2026-08-12), and stays to the end of the block on his answer of 2026-11-11.",
+        "tier_lists/adductors.md #1, S (the decider's list); step 2, goal C; kept by his "
+        "answer of 2026-11-11 ('Yes, all four')",
         listed_as="Adductor machine",
         better="checked 2026-10-16: it replaced the adductor ladder (best rung A); approved "
-               "2026-10-16 ('4 yes the gym has the machine')"),
+               "2026-10-16 ('4 yes the gym has the machine'); kept 2026-11-11 so the "
+               "strength sessions do not change mid-block"),
 
     # ── The block's measurements and its Sunday session (goal_block.py) ─────
     "Timed plank test": Pick(
@@ -435,6 +439,64 @@ PICKS: dict[str, Pick] = {
            "Tailor's pose, unloaded", "Frog rocks", "Butterfly PIR",
            "90/90 hip rotations with lift-offs", "Triangle side split, external-rotation cue"),
            start=1)},
+    # The front split stack (2026-11-11): the flexibility goal's new skill, the
+    # evening session's stack for the pattern of his latest front split test.
+    # His answers the same day ("Yes, all four"): the front split only, one cold
+    # test morning, and this plan written from the blueprint's method, the tier
+    # lists and his record. Checked against a better exercise per job below.
+    **{name: Pick(
+        "C", "the front split", job, reason,
+        "front_split_prescription.py, from the front split test; his answers of 2026-11-11 "
+        "('I want to change the mobility plan from the pancake to the front split as the "
+        "objective', then 'Yes, all four')",
+        better=better)
+       for name, job, reason, better in (
+           ("Straight-leg raise lifts", "strength at length",
+            "The hip muscles lift the straight leg into the front leg's range: the range he "
+            "can use, and the hamstrings relax while they work (the blueprint's active lifts).",
+            "checked 2026-11-11: the blueprint's method 4 for the resisted end it weights him "
+            "to; a loaded version waits for the unloaded range"),
+           ("Straight-leg lowers from the top", "strength at length",
+            "The bent-knee lift reaches the top of the range, then the straight leg lowers "
+            "slowly: it loads the range the straight lift cannot reach yet.",
+            "checked 2026-11-11: the blueprint's method 5, the eccentric overload of the lift "
+            "before it; nothing else loads the top of that range unweighted"),
+           ("Half split contract-relax", "range",
+            "Press the heel down, let go, sink: more front-leg range with a flat back, where "
+            "the hamstrings are short.",
+            "checked 2026-11-11: the blueprint's workhorse for more range (method 1); the "
+            "flat-back kneeling version keeps it off the forward-fold rule"),
+           ("Kneeling hip flexor stretch, pelvis tucked", "range",
+            "The back leg's deep hip flexors with the knee bent; the tuck puts the range in "
+            "the hip, not the lower back.",
+            "checked 2026-11-11: the isolation the blueprint names (knee bent separates the "
+            "deep group); a couch stretch adds the knee and belongs to the next item"),
+           ("Kneeling front-of-thigh stretch, heel to hand", "range",
+            "The back leg's front-of-thigh muscle, which crosses the knee: the bent knee "
+            "loads it, the tuck keeps the lower back still.",
+            "checked 2026-11-11: the knee-bent half of the blueprint's isolation; the couch "
+            "stretch's deeper knee bend under bodyweight is the harder version for later"),
+           ("Back-knee hover hold", "strength at length",
+            "The back leg's hip flexors carry the leg with the hip straight: strength at the "
+            "length the stretches give, his own specification of 2026-08-24.",
+            "checked 2026-11-11: hip_flexors.md lists strength at length as the area's job; "
+            "his own hover is the unloaded version of it and needs no machine"),
+           ("Front split slides, hips square", "technique",
+            "Teaches the square-hip split at a depth that costs little, before volume builds "
+            "the rotated cheat.",
+            "checked 2026-11-11: the blueprint's technique rule for this skill ('hips "
+            "square'); a technique drill has no stronger stand-in"),
+           ("Front split on blocks, hips square", "range",
+            "The skill itself, last in the stack, the blocks taking the weight a hypermobile "
+            "hip should not hang on.",
+            "checked 2026-11-11: the skill is the last item of every stack by the blueprint's "
+            "order; the blocks are its supported version"),
+           ("Front split heel-press holds", "strength at length",
+            "Short presses inside the split make the depth strong rather than only reached "
+            "(the blueprint's isometric holds for reps).",
+            "checked 2026-11-11: method 3, which the blueprint calls the one to reach for by "
+            "default; reps beat one long hold"),
+       )},
     # The EGYM session (2026-11-08), session D of the block from week 4 (his words,
     # 2026-11-11: "Can we make this training Training day D", then "Yes, build it").
     # Each machine's goal is the goal of the block's exercise of the same kind.

@@ -51,10 +51,37 @@ MOBILITY_TYPE = "Evening Mobility"
 NOTE = ("Strength in the morning, this session in the evening. Each exercise opens the "
         "next one, so do them in this order.")
 
+#: The overview's line before the first front split test (2026-11-11): the goal
+#: is the front split, and its stack waits for the test that picks it.
+NOTE_BEFORE_TEST = ("Your flexibility goal is now the front split. Take its test first, on "
+                    "a cold morning after a day with no leg training (Insights, "
+                    "Flexibility). Until then this is the side split stack you had.")
 
-def build_day() -> dict:
-    """The session in the shape a plan day has, so the same guided flow runs it."""
-    return gb.evening_mobility_day()
+
+def build_day(front_split_pattern: str | None = None) -> dict:
+    """The session in the shape a plan day has, so the same guided flow runs it:
+    the front split stack for the latest front split test's pattern, or, before
+    the first test, the last stack a test prescribed (goal_block.
+    evening_mobility_day)."""
+    return gb.evening_mobility_day(front_split_pattern)
+
+
+def note(front_split_pattern: str | None) -> str:
+    return NOTE if front_split_pattern else NOTE_BEFORE_TEST
+
+
+def front_split_pattern(repo, today: date) -> str | None:
+    """The pattern of the latest front split test, or None: no test yet, no
+    pattern reached, or the store could not be read (the last stack runs, never
+    a guessed one)."""
+    from services import flexibility as fx
+    try:
+        latest = fx.latest(repo.get_flexibility_assessments(), fx.GOAL_CLUSTER)
+    except Exception:
+        return None
+    if latest is None:
+        return None
+    return fx.assess(latest, today).pattern
 
 
 def scheduled_day(phases, d: date) -> dict | None:

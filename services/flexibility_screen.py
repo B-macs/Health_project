@@ -27,13 +27,16 @@ def _battery(cluster: str | None = None):
     return fx.CLUSTERS.get(cluster or fx.DEFAULT_CLUSTER, fx.CLUSTERS[fx.DEFAULT_CLUSTER])["battery"]
 
 
-def read_data(repo, today: date) -> dict:
-    """{"report", "count"}: the latest assessment run through the battery,
-    with every stored assessment counted toward the baseline mornings."""
-    stored = repo.get_flexibility_assessments()
-    latest = stored[-1] if stored else None
-    return {"report": fx.assess(latest, today, baseline_sessions=len(stored)),
-            "count": len(stored)}
+def read_data(repo, today: date, cluster: str | None = None) -> dict:
+    """{"report", "count"}: the cluster's latest assessment run through the
+    battery, with every stored assessment of that cluster counted toward the
+    baseline mornings. The cluster is the flexibility goal's unless named
+    (fx.GOAL_CLUSTER: the front split from 2026-11-11)."""
+    key = cluster or fx.GOAL_CLUSTER
+    own = fx.of_cluster(repo.get_flexibility_assessments(), key)
+    latest = own[-1] if own else None
+    return {"report": fx.assess(latest, today, baseline_sessions=len(own), cluster_key=key),
+            "count": len(own)}
 
 
 def slots_total(report) -> int:
@@ -183,7 +186,10 @@ def session_reading(test_key: str, earlier: tuple, today: date) -> dict:
     """What a retest entry asks for: the test's unit and sides, the hint at the
     input, the setup number with the one from the last assessment offered
     back, and whether the step takes an added load."""
-    shown = test_out(_battery().TESTS[test_key], earlier, begin(today, cold=True))
+    # The block's retest entries are Cluster A's tests (weeks 1-2, WP-33), so
+    # this path reads Cluster A whatever the goal is now.
+    shown = test_out(_battery(fx.DEFAULT_CLUSTER).TESTS[test_key], earlier,
+                     begin(today, cold=True, cluster=fx.DEFAULT_CLUSTER))
     return {"test_key": test_key, "unit": shown["unit"],
             "sides": ["left", "right"] if shown["bilateral"] else [""],
             "input_hint": shown["input_hint"].replace("**", ""),
@@ -195,8 +201,9 @@ def readings_from_session(entries: list[dict], day: date) -> btry.Assessment:
     """The readings a session typed into its retest entries, as one cold
     assessment of `day`. Each entry: {"test_key", "values": {side: value},
     "setup_value", "load_kg"}; a side left blank is not a reading. Raises
-    CaptureRefused on a test or a side the battery does not have."""
-    draft = begin(day, cold=True)
+    CaptureRefused on a test or a side the battery does not have. Cluster A's
+    tests: the block's retest entries are its (see session_reading)."""
+    draft = begin(day, cold=True, cluster=fx.DEFAULT_CLUSTER)
     order = capture_order(draft)
     for e in entries:
         key = e.get("test_key")
@@ -271,29 +278,39 @@ def test_out(test, earlier: tuple = (), draft: btry.Assessment | None = None) ->
     }
 
 
-def guide() -> dict:
+def guide(cluster: str | None = None) -> dict:
     """The protocol's fixed explanations, as the cluster modules write them:
     the three measures, the gap, the lock, the setup numbers, the progression
-    variable, the nerve check and the medial knee note, the slots and why
-    they run in order, and the tests held back for now."""
-    import cluster_a_battery as cba
+    variable, the nerve check and the second note (Cluster A's inside of the
+    knee, the front split's front of the hip), the slots and why they run in
+    order, and the tests held back for now. The goal's cluster unless named."""
     import flexibility_baselines as fb
-    moving_name, moving_why = fb.PROGRESSION_VARIABLE
+    key = cluster or fx.GOAL_CLUSTER
+    battery = _battery(key)
+    moving_name, moving_why = getattr(battery, "PROGRESSION_VARIABLE", fb.PROGRESSION_VARIABLE)
+    frozen = getattr(battery, "FROZEN_CONSTANTS", fb.FROZEN_CONSTANTS)
+    # The second note and the code the phone heads it by: Cluster A's inside
+    # of the knee, the front split's front of the hip.
+    if getattr(battery, "MEDIAL_KNEE_NOTE", ""):
+        second_code, second_note = "inner_knee", battery.MEDIAL_KNEE_NOTE
+    else:
+        second_code, second_note = "front_hip", getattr(battery, "FRONT_HIP_NOTE", "")
     return {
         "measures": [{"measure": m, "short": s, "long": lg}
                      for m, s, lg in fb.MEASURES_EXPLAINED],
         "gap": fb.GAP_EXPLAINED, "lock": fb.LOCK_EXPLAINED,
-        "frozen": [{"name": n, "why": w} for n, w in fb.FROZEN_CONSTANTS],
+        "frozen": [{"name": n, "why": w} for n, w in frozen],
         "progression_variable": {"name": moving_name, "why": moving_why},
-        "cluster_label": fx.CLUSTERS[fx.DEFAULT_CLUSTER]["label"],
-        "nerve_check": cba.NERVE_CHECK, "medial_knee_note": cba.MEDIAL_KNEE_NOTE,
+        "cluster_label": fx.CLUSTERS[key]["label"],
+        "nerve_check": battery.NERVE_CHECK, "medial_knee_note": second_note,
+        "second_note": second_code,
         "slots": [{"slot": s, "label": btry.SLOT_LABELS[s], "question": btry.SLOT_QUESTIONS[s],
                    "decides": btry.SLOT_DECIDES[s]}
-                  for s in (btry.SLOT_REGRESSED, btry.SLOT_PREREQUISITE, btry.SLOT_SPECTRUM)],
-        "held_back": [{"key": k, "label": cba.TESTS[k].label,
-                       "until": cba.TESTS[k].deferred_until, "safety": cba.TESTS[k].safety}
-                      for k in cba.DEFERRED_TESTS],
-        "test_count": len(_battery().AVAILABLE_TESTS),
+                  for s in sorted(battery.SLOT_TESTS)],
+        "held_back": [{"key": k, "label": battery.TESTS[k].label,
+                       "until": battery.TESTS[k].deferred_until, "safety": battery.TESTS[k].safety}
+                      for k in battery.DEFERRED_TESTS],
+        "test_count": len(battery.AVAILABLE_TESTS),
     }
 
 
@@ -302,9 +319,9 @@ EXERCISE_DETAIL_FIELDS = ("spectrum", "position", "movement", "feel", "stop", "p
                           "note", "adapted_from", "reverts_when", "deferred_until")
 
 
-def _exercise_detail(name: str) -> dict | None:
-    import cluster_a_mechanics as cam
-    ex = cam.exercise(name)
+def _exercise_detail(name: str, cluster: str | None = None) -> dict | None:
+    ex = fx.CLUSTERS.get(cluster or fx.DEFAULT_CLUSTER,
+                         fx.CLUSTERS[fx.DEFAULT_CLUSTER])["mechanics"].exercise(name)
     if ex is None:
         return None
     return {k: getattr(ex, k, "") or "" for k in EXERCISE_DETAIL_FIELDS}
@@ -316,7 +333,7 @@ def report_out(repo, report, today: date) -> dict:
     the ladder (top rung first), the stack with each exercise's how-to, the
     slots run and the ones not run (F10), every reading, and the retest
     status."""
-    import cluster_a_prescription as cap
+    cap = fx.CLUSTERS.get(report.cluster, fx.CLUSTERS[fx.DEFAULT_CLUSTER])["prescription"]
     result = report.result
     slots = result.slots if result else ()
     out = {
@@ -346,11 +363,11 @@ def report_out(repo, report, today: date) -> dict:
         "retest_text": cap.RETEST,
     }
     if not report.pattern:
-        stored = repo.get_flexibility_assessments()
-        if stored:
+        own = fx.latest(repo.get_flexibility_assessments(), report.cluster)
+        if own is not None:
             out["missing"] = [{"test_key": m.test_key, "side": m.side, "setup": m.setup,
                                "label": m.label, "hint": m.hint}
-                              for m in missing_inputs(stored[-1], report)]
+                              for m in missing_inputs(own, report)]
     else:
         try:
             stack = fx.prescribe(report)
@@ -360,14 +377,17 @@ def report_out(repo, report, today: date) -> dict:
             out["stack"] = {
                 "pattern": stack.pattern, "limiter": stack.limiter, "outro": stack.outro,
                 "items": [{"exercise": i.exercise, "dose": i.dose, "note": i.note,
-                           "detail": _exercise_detail(i.exercise)} for i in stack.live_items],
-                "held_back": [{"exercise": i.exercise, "detail": _exercise_detail(i.exercise)}
+                           "detail": _exercise_detail(i.exercise, report.cluster)}
+                          for i in stack.live_items],
+                "held_back": [{"exercise": i.exercise,
+                               "detail": _exercise_detail(i.exercise, report.cluster)}
                               for i in stack.items if i.deferred]}
     if report.assessed_on:
         try:
             status, reason = fx.retest_readiness(
                 report.assessed_on, today,
-                fx.leg_loading_days(repo.get_recent_sessions(days=60, today=today)))
+                fx.leg_loading_days(repo.get_recent_sessions(days=60, today=today)),
+                cluster_key=report.cluster)
             out["retest"] = {"status": status, "reason": reason}
         except Exception:
             out["retest"] = None
@@ -379,9 +399,8 @@ def capture_out(repo, today: date, draft: btry.Assessment) -> dict:
     protocol, the tests done, the readings in so far, the battery's early
     answer (a pattern: stop here, a reading below a failure cannot be
     interpreted), the skip notes and the progress."""
-    import cluster_a_battery as cba
     try:
-        earlier = repo.get_flexibility_assessments()
+        earlier = tuple(fx.of_cluster(repo.get_flexibility_assessments(), draft.cluster))
     except Exception:
         earlier = ()
     order = capture_order(draft)
@@ -394,7 +413,7 @@ def capture_out(repo, today: date, draft: btry.Assessment) -> dict:
         "done": [k for k in order if any(r.test_key == k and r.usable for r in draft.readings)],
         "readings": [reading_out(r, draft.cluster) for r in draft.readings],
         "early_pattern": live.pattern,
-        "early_pattern_label": cba.PATTERNS.get(live.pattern, "") if live.pattern else "",
+        "early_pattern_label": battery.PATTERNS.get(live.pattern, "") if live.pattern else "",
         "early_reason": live.slots[-1].reason if live.pattern and live.slots else "",
         "skip_notes": skip_notes(draft),
         "progress": {"done": done, "total": total},
@@ -411,7 +430,7 @@ def screen(repo, today: date) -> dict:
         # "Could not read the flexibility record", never an empty one (I26).
         return {"state": "unreadable", "load_error": f"{type(exc).__name__}: {exc}",
                 "count": 0, "report": None, "capture": None,
-                "legs_loaded_yesterday": False, "guide": guide()}
+                "legs_loaded_yesterday": False, "guide": guide(fx.GOAL_CLUSTER)}
     try:
         draft = repo.get_flexibility_draft()
     except Exception:
@@ -423,7 +442,7 @@ def screen(repo, today: date) -> dict:
         "report": report_out(repo, data["report"], today) if data["count"] else None,
         "capture": capture_out(repo, today, draft) if draft is not None else None,
         "legs_loaded_yesterday": legs_loaded_yesterday(repo, today),
-        "guide": guide(),
+        "guide": guide(draft.cluster if draft is not None else fx.GOAL_CLUSTER),
     }
 
 
@@ -433,7 +452,7 @@ def start_capture(repo, today: date, cold: bool) -> dict:
     assessment already in progress is answered, never replaced."""
     draft = repo.get_flexibility_draft()
     if draft is None:
-        draft = begin(today, cold)
+        draft = begin(today, cold, cluster=fx.GOAL_CLUSTER)
         repo.save_flexibility_draft(draft)
     return capture_out(repo, today, draft)
 
@@ -475,18 +494,18 @@ def add_missing(repo, today: date, entries: list[dict]) -> dict:
     """The readings the battery is waiting on, merged into the latest
     assessment (fill_missing) and stored, so the battery re-runs over them
     by the path a live reading takes."""
-    import cluster_a_battery as cba
-    stored = repo.get_flexibility_assessments()
-    if not stored:
+    own = fx.latest(repo.get_flexibility_assessments(), fx.GOAL_CLUSTER)
+    if own is None:
         raise CaptureRefused("no_assessment")
+    battery = _battery(own.cluster)
     entered = {}
     for e in entries:
-        if e.get("test_key") not in cba.TESTS:
+        if e.get("test_key") not in battery.TESTS:
             raise CaptureRefused("unknown_test", [str(e.get("test_key"))])
-        entered[cba.MissingInput(e["test_key"], e.get("side") or "",
-                                 bool(e.get("setup")))] = e.get("value")
-    updated = fill_missing(stored[-1], entered)
-    if updated is stored[-1]:
+        entered[battery.MissingInput(e["test_key"], e.get("side") or "",
+                                     bool(e.get("setup")))] = e.get("value")
+    updated = fill_missing(own, entered)
+    if updated is own:
         raise CaptureRefused("nothing_entered")
     repo.save_flexibility_assessment(updated)
     return screen(repo, today)

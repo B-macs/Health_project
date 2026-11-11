@@ -217,6 +217,23 @@ the bonus day (`goal_week.BONUS_DOSE_AREAS`).
 
 ## Goal C — flexibility that lasts — APPROVED 2026-10-14
 
+**FROM 2026-11-11 THE SKILL IS THE FRONT SPLIT** (the athlete: *"I want to
+change the mobility plan from the pancake to the front split as the
+objective"*; to four questions, *"Yes, all four"*): the front split only, in
+place of the side split and the pancake; one cold test morning first, on
+Insights › Flexibility (`front_split_battery.py`: the straight-leg raise under
+its own power and with a towel, the hanging thigh and the hanging shin, and the
+split from front heel to back toes, both sides), the exception to his rule of
+2026-11-08; the stack for the pattern that test reads (`front_split_
+prescription.py`, six patterns, every exercise in `front_split_mechanics.py`
+with a workflow record), run as the evening mobility session; and the adductor
+machine kept to the end of the block, for the groin the front split stretches.
+Until the first front split test, the evening session runs pattern D's stack
+below. **Proof:** the split's heel-to-toe gap against twice his leg length (a
+full split), at the retest twelve weeks after the first test, after the block.
+The expected pattern is the front leg (H): hamstrings normal with no reserve.
+The text below is Goal C as approved on 2026-10-14.
+
 A separate goal: to be more flexible, and to keep it. One session a week in
 every stage. The skills are the side split and the pancake (Cluster A).
 
@@ -286,6 +303,7 @@ so that the left cannot do the right's work.
 | Area | Job | Source |
 |---|---|---|
 | Adductors, knees bent | Range, plus strength at length (the adductor ladder) | Flexibility test 2026-08-12: 21.5 cm against a 10 cm target |
+| From 2026-11-11, the front split: front-leg hamstrings, back-leg hip flexors, square hips | Range, strength at length, technique, by the front split test's pattern | His decision 2026-11-11; the test not yet taken |
 
 **Overlaps:** glute max, the hamstrings and the deep back muscles serve goal
 A's blocker 1 AND the main lifts — one exercise counts for both. The adductors

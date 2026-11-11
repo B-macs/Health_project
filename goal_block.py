@@ -59,6 +59,8 @@ import cluster_a_battery as _battery
 import cluster_a_mechanics as _mech
 import cluster_a_prescription as _rx
 import egym_circuit as _egym
+import front_split_mechanics as _fs_mech
+import front_split_prescription as _fs_rx
 from training_plan import _ex
 
 BLOCK_NAME = "12-Week Block — Hips, Back and Strength"
@@ -499,8 +501,10 @@ ADDUCTOR_MACHINE = _ex(
         "bounce at the open end. Hard sets, but never to failure: stop 1-2 reps before."
     ),
     biomechanical_focus=(
-        "The flexibility goal's blocker, the adductors with the knees bent (pattern D: 21.5 cm "
-        "against 10 cm, 2026-08-12): strength from a wide start, in the tested position. "
+        "Picked for the side split's blocker, the adductors with the knees bent (pattern D: "
+        "21.5 cm against 10 cm, 2026-08-12): strength from a wide start. From 2026-11-11 the "
+        "flexibility goal is the front split, and it stays to the end of the block on his "
+        "answer: adductor strength protects the groin the front split stretches. "
         "tier_lists/adductors.md, S; replaced the adductor ladder on 2026-10-16. Controlled "
         "range at Beighton 6/9 (rules: 'adductor machine')."
     ),
@@ -906,16 +910,17 @@ FLEXIBILITY_TEST_NAMES: tuple[str, ...] = tuple(e["name"] for e in FLEXIBILITY_T
 
 # ─── The Sunday session: the flexibility prescription for the last reading ──
 
-_DOSE_HOLD = re.compile(r"^(\d+) × (\d+) s$")
+_DOSE_HOLD = re.compile(r"^(\d+) × (\d+) s( per side)?$")
 _DOSE_REPS = re.compile(r"^(\d+) × (\d+)( per side)?$")
-_DOSE_ROUNDS = re.compile(r"^(\d+) rounds of (\d+) s contract, (\d+) s relax$")
+_DOSE_ROUNDS = re.compile(r"^(\d+) rounds of (\d+) s contract, (\d+) s relax( per side)?$")
 
 
-def _stack_entry(item) -> dict:
+def _stack_entry(item, mech=_mech, source: str = "") -> dict:
     """One prescribed line as a plan exercise: the dose from the prescription,
-    the how-to from the exercise library. Raises on a dose it cannot read, so a
-    new stack cannot slip in with a guessed dose."""
-    lib = _mech.exercise(item.exercise)
+    the how-to from the cluster's exercise library (`mech`). Raises on a dose it
+    cannot read, so a new stack cannot slip in with a guessed dose. A dose "per
+    side" makes the entry one-sided: each set is run on the left and the right."""
+    lib = mech.exercise(item.exercise)
     if lib is None:
         raise ValueError(f"{item.exercise!r} is not in the exercise library")
     mechanics = f"{lib.position} {lib.movement} FEEL: {lib.feel} STOP: {lib.stop}"
@@ -924,17 +929,19 @@ def _stack_entry(item) -> dict:
     common = dict(
         name=lib.name, mechanics=mechanics,
         biomechanical_focus=(
-            f"Goal C, the flexibility session: cluster_a_prescription pattern {FLEX_PATTERN} "
-            f"(the battery of 2026-08-12), prescribed dose {item.dose}. {lib.note}"
+            f"Goal C, the flexibility session: {source or f'cluster_a_prescription pattern {FLEX_PATTERN} (the battery of 2026-08-12)'}, "
+            f"prescribed dose {item.dose}. {lib.note}"
         ),
         progression=lib.progress,
         regression=lib.stop,
     )
     if m := _DOSE_HOLD.match(item.dose):
-        return _ex(ex_type="hold", sets=int(m[1]), hold_seconds=int(m[2]), rest_seconds=30, **common)
+        return _ex(ex_type="hold", sets=int(m[1]), hold_seconds=int(m[2]), rest_seconds=30,
+                   laterality="unilateral" if m[3] else "bilateral", **common)
     if m := _DOSE_ROUNDS.match(item.dose):
         return _ex(ex_type="hold_reps", sets=1, reps_in_set=int(m[1]), hold_seconds=int(m[2]),
-                   rest_seconds=int(m[3]), **common)
+                   rest_seconds=int(m[3]),
+                   laterality="unilateral" if m[4] else "bilateral", **common)
     if m := _DOSE_REPS.match(item.dose):
         return _ex(ex_type="reps", sets=int(m[1]), reps=int(m[2]), rest_seconds=45,
                    laterality="unilateral" if m[3] else "bilateral", **common)
@@ -942,6 +949,19 @@ def _stack_entry(item) -> dict:
 
 
 FLEX_STACK = [_stack_entry(i) for i in _rx.prescribe(FLEX_PATTERN).live_items]
+
+#: The front split's stack for every pattern its test can give (the athlete,
+#: 2026-11-11: the front split replaces the pancake as the flexibility goal).
+#: The evening session runs the one for the pattern of his latest front split
+#: test (services/mobility_session.py); written out for every pattern so each
+#: exercise's dose is read and its workflow record checked before any test.
+FRONT_SPLIT_STACKS: dict[str, list[dict]] = {
+    pattern: [_stack_entry(i, _fs_mech,
+                           f"front_split_prescription pattern {pattern} "
+                           f"({_fs_rx.STACKS[pattern].limiter})")
+              for i in stack.live_items]
+    for pattern, stack in _fs_rx.STACKS.items()
+}
 
 
 # ─── The days ────────────────────────────────────────────────────────────────
@@ -1013,19 +1033,31 @@ def _flexibility_day(week: int) -> dict:
     }
 
 
-def evening_mobility_day() -> dict:
-    """The evening mobility session from week 4 (EVENING_MOBILITY_FROM_WEEK):
-    the Sunday session's stack, the prescription for the last reading, with no
-    retest. Not a plan day: services/mobility_session.py offers it on the
-    evening of a strength day and stores it under its own Type."""
+def evening_mobility_day(front_split_pattern: str | None = None) -> dict:
+    """The evening mobility session from week 4 (EVENING_MOBILITY_FROM_WEEK).
+    Not a plan day: services/mobility_session.py offers it on the evening of a
+    strength day and stores it under its own Type.
+
+    The flexibility goal is the front split from 2026-11-11, and the session is
+    the front split stack for the pattern of his latest front split test. Before
+    that test it is the last stack a test prescribed, Cluster A's pattern D: a
+    front split stack with no pattern would be a guess (front_split_
+    prescription.prescribe refuses one)."""
+    if front_split_pattern:
+        stack = _fs_rx.prescribe(front_split_pattern)
+        objective = f"Evening mobility — Front split: {stack.limiter}"
+        exercises = list(FRONT_SPLIT_STACKS[stack.pattern])
+    else:
+        objective = "Evening mobility — Adductors and Hip Rotators"
+        exercises = list(FLEX_STACK)
     return {
-        "objective": "Evening mobility — Adductors and Hip Rotators",
+        "objective": objective,
         "phase": BLOCK_NAME,
         "session_rpe_target": 4,
         "is_gym_session": False,
         "day_type": "stretch",
         "session_kind": "flexibility",
-        "exercises": list(FLEX_STACK),
+        "exercises": exercises,
         "home": [],
     }
 

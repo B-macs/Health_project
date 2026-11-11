@@ -527,6 +527,73 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="caution", laterality="right",
     ),
 
+    # ── The front split (2026-11-11) ─────────────────────────────────────────
+    # The flexibility goal from 2026-11-11 (the athlete: "I want to change the
+    # mobility plan from the pancake to the front split as the objective").
+    # Every name front_split_mechanics.LIBRARY holds lands on one of these, so
+    # none reads `unknown`, which looks exactly like `cleared`.
+    MovementRule(
+        movement="front split",
+        reason="One leg forward, one back, under bodyweight. HIPS SQUARE, the blueprint's "
+               "own technique rule: the two cheats are the back hip swinging open and the "
+               "lower back arching, and both buy depth the hips did not give — the arch "
+               "over the L5/S1 retrolisthesis and the narrowed right foramen, a rounded "
+               "reach over the covered tears at L3/4 and L4/5. Hands on blocks take the "
+               "weight a hypermobile hip (Beighton 6/9) should not hang on; never bounce, "
+               "never loaded. A sharp pinch at the front of a hip, or tingling down a leg, "
+               "ends the set and is recorded. The left hip flexor (sartorius) strained "
+               "twice from running: build the left back leg's depth slowly.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="half split",
+        reason="Kneeling, the front leg straight: the hamstrings at length. Lean from the "
+               "hips with a FLAT back — a rounded reach is the forward-fold mechanism over "
+               "the covered tears at L3/4 and L4/5. Tingling or burning down the leg ends "
+               "the set (the narrowed right L5/S1 nerve exit).",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="straight leg raise",
+        reason="Active hip flexion with a straight knee, lying on the back. On the RIGHT, "
+               "active hip flexion past 60 degrees turned out is the snapping-hip trigger "
+               "(finding #4, key rule 7): the kneecap points straight up, and a click or a "
+               "snap ends that side. The other leg stays straight on the mat and the lower "
+               "back stays down.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="straight leg lowers",
+        reason="Slow lowering of a straight leg from the top of its range, lying on the "
+               "back: the same right-hip cue as the straight-leg raise (kneecap up, stop at "
+               "a click), and the lower back stays down while the leg lowers.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="kneeling hip flexor",
+        reason="Kneeling hip flexor stretch with the pelvis TUCKED. The range comes from "
+               "the hip; an arched lower back or flared ribs ends the hold, over the L5/S1 "
+               "retrolisthesis. With the right leg forward the right knee and toes point "
+               "straight ahead (key rule 7).",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="kneeling front of thigh",
+        reason="Kneeling stretch of the front of the back thigh, the back knee bent and the "
+               "heel drawn in by hand or towel. The same tuck as the hip flexor stretch: "
+               "the heel comes in only as far as the lower back stays still. Pad the back "
+               "knee.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="back knee hover",
+        reason="Split stance with the back knee hovering: the back leg's hip flexors carry "
+               "it with the hip straight, his own specification of 2026-08-24. The same "
+               "rule as the half-kneeling hold: no lumbar arch, ribs down, front knee over "
+               "the ankle, cued neutral on the right when that side is forward.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+
     # ── The mandatory pre-session release protocol ───────────────────────────
     # From patient_profile.py, not from any flexibility source. Named here so
     # the protocol that must precede EVERY session resolves like anything else

@@ -15,6 +15,9 @@
 !goal_week.py
 !daily_tendon.py
 !egym_circuit.py
+!front_split_battery.py
+!front_split_mechanics.py
+!front_split_prescription.py
 **/__pycache__
 **/*.pyc
 **/*.db

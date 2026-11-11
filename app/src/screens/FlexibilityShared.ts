@@ -20,6 +20,8 @@ export interface Guide {
   progression_variable: { name: string; why: string }
   nerve_check: string
   medial_knee_note: string
+  /** Which second note it is: Cluster A's inside of the knee, or the front split's front of the hip. */
+  second_note?: string
   slots: { slot: number; label: string; question: string; decides: string }[]
   held_back: { key: string; label: string; until: string; safety: string }[]
 }

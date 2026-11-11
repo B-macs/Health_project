@@ -76,7 +76,7 @@ export function ColdGate({ guide, legs, busy, onBegin }: {
         <summary className="tapline">{S.flex.neverChase}</summary>
         <p><b>{S.flex.nerveCheck}</b></p>
         <p><Marked text={guide.nerve_check} /></p>
-        <p><b>{S.flex.innerKnee}</b></p>
+        <p><b>{S.flex.secondNote[guide.second_note ?? 'inner_knee'] ?? S.flex.secondNote.inner_knee}</b></p>
         <p><Marked text={guide.medial_knee_note} /></p>
       </details>
       <div className="pair">

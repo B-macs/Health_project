@@ -1953,7 +1953,9 @@ def _fx_render_populated(report, accent: str) -> None:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _flexibility_screen_data() -> dict:
-    return fxs.read_data(repo.get_repository(), date.today())
+    # The Streamlit page draws Cluster A's screen; the phone app shows the goal's
+    # cluster (the front split from 2026-11-11).
+    return fxs.read_data(repo.get_repository(), date.today(), cluster="a")
 
 
 def _render_flexibility_detail() -> None:

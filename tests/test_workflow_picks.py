@@ -29,12 +29,15 @@ def _every_name() -> set[str]:
     """Every entry the sessions run, in their final order (ramp sets
     included), plus the home and off-gym items, every entry of the
     registered block (goal_block.py): its tests and its Sunday session, and
-    every swap a session offers when equipment is in use (WP-28)."""
+    every swap a session offers when equipment is in use (WP-28), and every
+    front split stack the evening session can run (2026-11-11): which one runs
+    depends on a test not yet taken, so every pattern's is checked now."""
     names = {c.name for d in gw.DAYS for c in pl.order(WEEK[d])}
     names |= {c.name for c in gw.CARDS + gw.BONUS_ORDER}
     names |= {e["name"] for day in gb.PLAN_GOAL_BLOCK.values()
               for e in day["exercises"] + day.get("home", [])}
     names |= {e["name"] for alt in gb.ALTERNATIVES.values() for e in alt}
+    names |= {e["name"] for stack in gb.FRONT_SPLIT_STACKS.values() for e in stack}
     return names | set(gw.HOME) | set(gw.OFF_GYM)
 
 

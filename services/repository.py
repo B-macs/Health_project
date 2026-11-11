@@ -6941,10 +6941,16 @@ class Repository:
         training checkpoint already live in.
         """
         stamp = assessment.taken_on.isoformat()
+        # Same date AND same cluster (2026-11-11): the front split test can
+        # fall on a morning that also holds a Cluster A assessment, and one
+        # must not replace the other. A stored entry without a cluster is
+        # Cluster A's (flexibility.DEFAULT_CLUSTER).
+        cluster = assessment.cluster or flexibility.DEFAULT_CLUSTER
 
         def _replace_same_date(existing):
             kept = [d for d in (existing or [])
-                    if not (isinstance(d, dict) and d.get("taken_on") == stamp)]
+                    if not (isinstance(d, dict) and d.get("taken_on") == stamp
+                            and (d.get("cluster") or flexibility.DEFAULT_CLUSTER) == cluster)]
             kept.append(flexibility.assessment_to_dict(assessment))
             return kept
 

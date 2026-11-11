@@ -448,10 +448,13 @@ def daily_plan(repo, today: date) -> dict:
                if mob.done_today(dly.read_day_sessions(repo, d))]
     if not r.phases_error and (mob.done_today(day_sessions)
                                or mob.is_due(r.phases, today, done_on)):
-        out = compose(repo, today, kind=MOBILITY, day_num=None, content=mob.build_day(),
+        # The front split stack for his latest front split test (2026-11-11);
+        # before the first test, the last stack a test prescribed.
+        pattern = mob.front_split_pattern(repo, today)
+        out = compose(repo, today, kind=MOBILITY, day_num=None, content=mob.build_day(pattern),
                       decided=decided)
         out["next_day"] = None
-        out["note"] = mob.NOTE
+        out["note"] = mob.note(pattern)
         out["reminder"] = None
         out["done_today"] = mob.done_today(day_sessions)
         return out

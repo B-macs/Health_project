@@ -49,12 +49,15 @@ import training_constants as _tc
 import cluster_a_mechanics as _a_mech
 import cluster_a_prescription as _a_rx
 import flexibility_baselines as _fb
+import front_split_battery as _fs_battery
+import front_split_mechanics as _fs_mech
+import front_split_prescription as _fs_rx
 from services import battery as _b
 
 # ── clusters ─────────────────────────────────────────────────────────────────
 
-#: Every cluster the app knows about. One entry today; the shape is what makes
-#: adding a second one a data change rather than a code change.
+#: Every cluster the app knows about. The front split joined on 2026-11-11 as a
+#: data change, the shape this map was made for.
 CLUSTERS: dict[str, dict] = {
     "a": {
         "key": "a",
@@ -64,9 +67,36 @@ CLUSTERS: dict[str, dict] = {
         "battery": _a_battery,
         "prescription": _a_rx,
     },
+    "front_split": {
+        "key": "front_split",
+        "label": _fs_mech.CLUSTER_LABEL,
+        "skills": _fs_mech.SKILLS,
+        "mechanics": _fs_mech,
+        "battery": _fs_battery,
+        "prescription": _fs_rx,
+    },
 }
 
+#: The cluster a stored assessment without one belongs to: every assessment
+#: before 2026-11-11 is Cluster A's.
 DEFAULT_CLUSTER: str = "a"
+
+#: The flexibility goal's skill (the athlete, 2026-11-11: "I want to change the
+#: mobility plan from the pancake to the front split as the objective"). The
+#: Insights screen and a new capture read this cluster; Cluster A's assessments
+#: stay stored as its history.
+GOAL_CLUSTER: str = "front_split"
+
+
+def latest(assessments, cluster_key: str) -> "_b.Assessment | None":
+    """The newest stored assessment of one cluster, or None."""
+    own = [a for a in assessments or () if a.cluster == cluster_key]
+    return own[-1] if own else None
+
+
+def of_cluster(assessments, cluster_key: str) -> list:
+    """The stored assessments of one cluster, oldest first."""
+    return [a for a in assessments or () if a.cluster == cluster_key]
 
 #: An assessment's confidence halves every this many days. Range of motion is
 #: slow-changing, so a year is generous rather than punitive. Staleness decays
@@ -102,7 +132,8 @@ class Report:
     def pattern_label(self) -> str:
         if not self.pattern:
             return ""
-        return _a_battery.PATTERNS.get(self.pattern, "")
+        spec = CLUSTERS.get(self.cluster, CLUSTERS[DEFAULT_CLUSTER])
+        return spec["battery"].PATTERNS.get(self.pattern, "")
 
     @property
     def trusted(self) -> bool:
@@ -124,15 +155,17 @@ def cluster(key: str = DEFAULT_CLUSTER) -> dict:
 def assess(assessment: _b.Assessment | None,
            today: date,
            *,
-           baseline_sessions: int = 0) -> Report:
+           baseline_sessions: int = 0,
+           cluster_key: str = DEFAULT_CLUSTER) -> Report:
     """Run the battery for an assessment's cluster and wrap the result.
 
     `None` in gives an honest empty report rather than a zero — no assessment
-    has been run, and a zero would read as "measured, and bad".
+    has been run, and a zero would read as "measured, and bad". `cluster_key`
+    names the cluster of that empty report.
     """
     if assessment is None:
-        return Report(cluster=DEFAULT_CLUSTER,
-                      cluster_label=CLUSTERS[DEFAULT_CLUSTER]["label"],
+        spec = CLUSTERS.get(cluster_key, CLUSTERS[DEFAULT_CLUSTER])
+        return Report(cluster=spec["key"], cluster_label=spec["label"],
                       result=None, confidence=0.0, assessed_on=None)
 
     spec = CLUSTERS.get(assessment.cluster, CLUSTERS[DEFAULT_CLUSTER])
@@ -447,6 +480,12 @@ MOBILITY_TIER_LOADS_LEGS: frozenset[str] = frozenset({
     # test (WP-33); the old name stays for the sessions logged under it.
     "Flexibility Retest (Test)",
     *_tc.FLEXIBILITY_TEST_NAMES,
+    # The front split stack (2026-11-11): the hamstrings and hip flexors the
+    # front split test measures, worked at length on purpose. Its mobility-tier
+    # names only; the lifts, lowers, presses and the hover sit in heavier tiers,
+    # where the lower-body region alone already counts them as loaded.
+    *(e.name for e in _fs_mech.LIBRARY
+      if (_tc.EXERCISE_MOVEMENT_WEIGHT.get(e.name) or ("", 0))[0] == "mobility_core"),
 })
 
 
@@ -582,7 +621,10 @@ def retest_notice(assessments: list, recent_sessions, today: date) -> tuple[str,
     runs, oldest first; `recent_sessions` the last three days' sessions."""
     if not assessments:
         return None
+    last = assessments[-1]
+    cluster_key = getattr(last, "cluster", DEFAULT_CLUSTER)
     status, reason = retest_readiness(
-        assessments[-1].taken_on, today, leg_loading_days(recent_sessions))
+        last.taken_on, today, leg_loading_days(recent_sessions),
+        cluster_key=cluster_key if cluster_key in CLUSTERS else DEFAULT_CLUSTER)
     kind = RETEST_NOTICE_KIND.get(status)
     return (kind, status, reason) if kind else None

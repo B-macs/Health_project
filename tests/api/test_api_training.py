@@ -30,6 +30,8 @@ pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+import front_split_battery as fsb  # noqa: E402
+import front_split_prescription as fsr  # noqa: E402
 import goal_block as gb  # noqa: E402
 from healthapi.deps import get_repository, get_sync_runner  # noqa: E402
 from healthapi.main import create_app  # noqa: E402
@@ -414,16 +416,47 @@ def test_a_strength_day_before_a_rest_day_offers_the_evening_mobility_session(en
     the evening ... on the days I have no strength training the next day ...
     The mobility training will replace the tendon training on those days."
     Tuesday (B) is before Wednesday's rest: the second tile's address answers
-    with the Sunday stack, no 8-hour line and the plan's own time model."""
+    with the Sunday stack, no 8-hour line and the plan's own time model. With
+    no front split test taken yet (the goal from 2026-11-11), the stack is the
+    last one a test prescribed and the note asks for the front split test."""
     from services import mobility_session as mob
     plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
     assert plan["kind"] == "mobility" and plan["plan_days"] is None
     assert [e["name"] for e in plan["exercises"]] == [e["name"] for e in gb.FLEX_STACK]
-    assert plan["reminder"] is None and plan["done_today"] is False and plan["note"] == mob.NOTE
+    assert (plan["reminder"] is None and plan["done_today"] is False
+            and plan["note"] == mob.NOTE_BEFORE_TEST)
     assert plan["steps"] and 20 <= plan["model_minutes"] <= 30
     assert plan["ask_length_above_minutes"] == sess.DURATION_CHECK_RATIO * plan["model_minutes"]
     # Monday (A) is before Tuesday's strength: the daily tendon session.
     assert env.ok(monkeypatch, "get", "/api/training/daily")["kind"] == "daily"
+
+
+def test_after_the_front_split_test_the_evening_runs_its_stack(env, monkeypatch):
+    """The athlete, 2026-11-11: "I want to change the mobility plan from the
+    pancake to the front split as the objective", then "Yes, all four". The
+    front split test is taken on Insights › Flexibility; when it reads the front
+    leg short (pattern H), the evening session is the front split stack for H,
+    and the note is the evening's own."""
+    from services import mobility_session as mob
+    state = env.ok(monkeypatch, "post", "/api/insights/flexibility/capture",
+                   body={"cold": True}, local=MONDAY)
+    assert [t["key"] for t in state["order"]] == list(fsb.TEST_ORDER)
+    readings = {"slr_active": 60.0, "slr_passive": 70.0, "hanging_thigh": 5.0,
+                "hanging_shin": 5.0, "split_span": 120.0}
+    for key in fsb.TEST_ORDER:
+        state = env.ok(monkeypatch, "put", "/api/insights/flexibility/capture", body={
+            "test_key": key, "entered": {"left": readings[key], "right": readings[key]},
+            "setup_value": 85.0 if key == "split_span" else None}, local=MONDAY)
+    assert state["early_pattern"] == "H"
+    report = env.ok(monkeypatch, "post", "/api/insights/flexibility/capture/finish",
+                    local=MONDAY)["report"]
+    assert report["pattern"] == "H" and report["cluster_label"] == "Front split"
+    assert [i["exercise"] for i in report["stack"]["items"]] == [
+        i.exercise for i in fsr.prescribe("H").live_items]
+    plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
+    assert plan["kind"] == "mobility" and plan["note"] == mob.NOTE
+    assert [e["name"] for e in plan["exercises"]] == [
+        e["name"] for e in gb.FRONT_SPLIT_STACKS["H"]]
 
 
 def test_an_evening_done_before_a_move_is_not_offered_again(env, monkeypatch):
