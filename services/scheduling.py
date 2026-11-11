@@ -759,16 +759,20 @@ def _not_run(phase: Phase, plan_dict: dict, overrides: dict[str, int], today: da
     the days from today once the proposal is applied. Rest days are not
     counted."""
     week = _week_in_phase(phase, today)
-    moved = replace(phase, date_overrides={**phase.date_overrides, **overrides})
 
-    def names(ph: Phase, days: list[date]) -> Counter:
+    def now(d: date) -> int:
+        return plan.day_number_in_phase(phase, d)
+
+    def proposed(d: date) -> int:
+        return overrides.get(d.isoformat(), now(d))
+
+    def names(day_of, days: list[date]) -> Counter:
         return Counter(name for d in days
-                       if (name := _day_name(plan_dict.get(plan.day_number_in_phase(ph, d))))
-                       != "rest day")
+                       if (name := _day_name(plan_dict.get(day_of(d)))) != "rest day")
 
     ahead = [d for d in week if d >= today]
     missed = [date.fromisoformat(iso) for iso in overrides if date.fromisoformat(iso) < today]
-    return sorted((names(phase, ahead) + names(phase, missed) - names(moved, ahead)).elements())
+    return sorted((names(now, ahead) + names(now, missed) - names(proposed, ahead)).elements())
 
 
 def in_order_summary(phase: Phase, plan_dict: dict, overrides: dict[str, int],
