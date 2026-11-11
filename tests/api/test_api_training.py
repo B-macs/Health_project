@@ -426,6 +426,44 @@ def test_a_strength_day_before_a_rest_day_offers_the_evening_mobility_session(en
     assert env.ok(monkeypatch, "get", "/api/training/daily")["kind"] == "daily"
 
 
+def test_a_session_moved_to_a_later_day_takes_the_evening_mobility_with_it(env, monkeypatch):
+    """The athlete, 2026-11-11: "if I move Friday training of this week C to
+    tomorrow, the Friday becomes the rest day and mobility goes to tomorrow
+    evening instead of tonight, and D training stays on Saturday morning ...
+    It needs to be able to handle it." The same move in week 1: on Tuesday
+    (B, before Wednesday's rest), Thursday's C moves to Wednesday."""
+    from services import plan as ph
+    thursday, friday = MONDAY + timedelta(days=3), MONDAY + timedelta(days=4)
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)["kind"] == "mobility"
+    day = env.ok(monkeypatch, "get", f"/api/training/day?date={thursday}", local=TUESDAY)
+    moves = {m["date"]: m for m in day["moves"]}
+    assert list(moves) == [(MONDAY + timedelta(days=i)).isoformat() for i in (2, 4, 5, 6)]
+    assert moves[WEDNESDAY.isoformat()]["available"]
+    assert moves[WEDNESDAY.isoformat()]["holds"] == "rest day"
+    assert moves[friday.isoformat()]["holds"] == "session D"
+    assert env.ok(monkeypatch, "post", "/api/training/swap", local=TUESDAY,
+                  body={"date": thursday.isoformat(), "to": WEDNESDAY.isoformat()}) == {"stored": True}
+    stored = env.phase()
+    assert [ph.day_number_in_phase(stored, MONDAY + timedelta(days=i)) for i in range(7)] == [
+        1, 2, 4, 3, 5, 6, 7]
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)["kind"] == "daily"
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=WEDNESDAY)["kind"] == "mobility"
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=thursday)["kind"] == "daily"
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=friday)["kind"] == "mobility"
+
+
+def test_a_move_to_a_past_day_or_into_the_next_week_stores_nothing(env, monkeypatch):
+    thursday = MONDAY + timedelta(days=3)
+    r = env.call(monkeypatch, "post", "/api/training/swap", local=WEDNESDAY,
+                 body={"date": thursday.isoformat(), "to": TUESDAY.isoformat()})
+    assert r.status_code == 409 and r.json()["error"].startswith("swap_blocked")
+    r = env.call(monkeypatch, "post", "/api/training/swap", local=TUESDAY,
+                 body={"date": thursday.isoformat(),
+                       "to": (MONDAY + timedelta(days=8)).isoformat()})
+    assert r.status_code == 409
+    assert env.phase().date_overrides == {}
+
+
 def test_a_saved_evening_session_is_done_counts_in_strain_and_leaves_the_strength_day_open(
         env, monkeypatch):
     """Its own Type, an extra: the morning's strength session is still offered,

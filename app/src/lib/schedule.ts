@@ -35,6 +35,9 @@ export async function sendAnswer(store: HealthDB, kind: ScheduleKind, path: stri
 
 export const swapWithToday = (store: HealthDB, day: string) =>
   sendAnswer(store, 'swap', '/api/training/swap', { date: day })
+/** A day's session to a later day of the same week (2026-11-11): the two days trade. */
+export const moveToDay = (store: HealthDB, day: string, to: string) =>
+  sendAnswer(store, 'swap', '/api/training/swap', { date: day, to })
 export const answerCarry = (store: HealthDB, accept: boolean) =>
   sendAnswer(store, 'carry', '/api/training/carry', { accept })
 export const answerShift = (store: HealthDB, accept: boolean) =>

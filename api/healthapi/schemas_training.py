@@ -174,6 +174,17 @@ class SwapOffer(BaseModel):
     today_objective: str
 
 
+class MoveOffer(BaseModel):
+    """A later day of the same week this day's session may move to
+    (2026-11-11): what that day holds now (the day left behind gets it), and
+    why it is blocked or what to keep in view."""
+    date: date
+    holds: str
+    available: bool
+    blockers: list[str]
+    warnings: list[str]
+
+
 class LoggedExercise(BaseModel):
     name: str
     movement_type: str | None
@@ -243,8 +254,8 @@ class TodayOverview(BaseModel):
 
 class TrainingDayOut(BaseModel):
     """`route`: rest, past_completed (with `logged`; None when its detail could
-    not be read), past_missed and future (with `planned` and `swap`), today
-    (with `overview`), no_phase (with `gap`) or phases_unreadable."""
+    not be read), past_missed and future (with `planned`, `swap` and `moves`),
+    today (with `overview`), no_phase (with `gap`) or phases_unreadable."""
     date: date
     route: str
     phases_error: str | None = None
@@ -255,6 +266,7 @@ class TrainingDayOut(BaseModel):
     logged: LoggedSession | None = None
     planned: PlannedDay | None = None
     swap: SwapOffer | None = None
+    moves: list[MoveOffer] | None = None
     overview: TodayOverview | None = None
 
 
@@ -267,6 +279,9 @@ ActionId = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0
 class SwapIn(BaseModel):
     #: The other day: its session comes to today, and today's goes there.
     date: date
+    #: A later day of the same week instead of today (2026-11-11): the session
+    #: moves there, and the other day gets what that day held.
+    to: date | None = None
     action_id: ActionId | None = None
 
 

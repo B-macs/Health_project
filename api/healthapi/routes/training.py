@@ -90,8 +90,10 @@ def _action(run):
 @router.post("/api/training/swap", response_model=StoredOut)
 def post_swap(body: SwapIn, today: date = Depends(local_today),
               repo: Repository = Depends(get_repository)) -> dict:
+    """Another day's session onto today, or onto `to`, a later day of the
+    same week (2026-11-11); the day left behind gets what the target held."""
     return _action(lambda: ts.once(repo, body.action_id, today,
-                                   lambda: ts.swap_with_today(repo, today, body.date)))
+                                   lambda: ts.swap_with_today(repo, today, body.date, body.to)))
 
 
 @router.post("/api/training/carry", response_model=StoredOut)

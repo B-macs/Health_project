@@ -304,6 +304,32 @@ def swap_offer(repo, r: Reads, day: date) -> dict:
             "today_objective": content["objective"] if content else f"Day {today_num}"}
 
 
+def move_offers(repo, r: Reads, day: date) -> list[dict]:
+    """The later days of the same week this day's session may move to
+    (2026-11-11, scheduling.manual_move_targets): each with what it holds now
+    (the day left behind gets it), its blockers and its warnings. Empty when
+    there is no later day, or when the logged sessions cannot be read: a move
+    is never offered on a check that did not run."""
+    targets = scheduling.manual_move_targets(r.active, day, r.today)
+    if not targets:
+        return []
+    try:
+        logged = repo.get_logged_session_dates(date.fromisoformat(r.active.start_date), r.today,
+                                               include_supplementary=False)
+    except Exception:
+        return []
+    out = []
+    for target in targets:
+        blockers = scheduling.manual_swap_blockers(r.active, day, r.today, logged, target=target)
+        content = (None if r.active.date_overrides.get(target.isoformat()) == 0
+                   else r.plan.get(_plan.day_number_in_phase(r.active, target)))
+        out.append({"date": target, "holds": scheduling.day_name(content),
+                    "available": not blockers, "blockers": blockers,
+                    "warnings": [] if blockers else scheduling.manual_swap_warnings(
+                        r.active, r.plan, day, r.today, target=target)})
+    return out
+
+
 def _planned(r: Reads, day: date) -> dict:
     day_num = _plan.day_number_in_phase(r.active, day)
     content = r.plan.get(day_num)
@@ -360,9 +386,11 @@ def day_view(repo, day: date, today: date) -> dict:
     elif route == "past_missed":
         out["planned"] = _planned(r, day)
         out["swap"] = swap_offer(repo, r, day)
+        out["moves"] = move_offers(repo, r, day)
     elif route == "future":
         out["planned"] = _planned(r, day)
         out["swap"] = swap_offer(repo, r, day)
+        out["moves"] = move_offers(repo, r, day)
     elif route == "today":
         out["overview"] = today_overview(repo, r)
         if out["overview"]["screen"] == "logged":
@@ -530,17 +558,20 @@ def apply_shift(repo, today: date, accept: bool) -> dict:
     return {"stored": True}
 
 
-def swap_with_today(repo, today: date, other: date) -> dict:
+def swap_with_today(repo, today: date, other: date, target: date | None = None) -> dict:
     """Swap another day's session onto today (a missed day carried forward,
-    or a future day pulled in), the blockers re-checked against a fresh read
-    of what is logged before the one permanent write."""
+    or a future day pulled in), or onto `target`, a later day of the same
+    week (2026-11-11: the day left behind gets what the target held). The
+    blockers are re-checked against a fresh read of what is logged before
+    the one permanent write; the week check is the write's own (Key Rule
+    18b, a refusal stores nothing)."""
     r = _live(repo, today)
-    logged = repo.get_logged_session_dates(min(other, today), max(other, today),
-                                           include_supplementary=False)
-    blockers = scheduling.manual_swap_blockers(r.active, other, today, logged)
+    days = (other, today) if target is None else (other, today, target)
+    logged = repo.get_logged_session_dates(min(days), max(days), include_supplementary=False)
+    blockers = scheduling.manual_swap_blockers(r.active, other, today, logged, target=target)
     if blockers:
         raise ActionRefused("swap_blocked", blockers)
-    _store(repo, r, *scheduling.manual_swap_entries(r.active, other, today))
+    _store(repo, r, *scheduling.manual_swap_entries(r.active, other, today, target=target))
     return {"stored": True}
 
 

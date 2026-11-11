@@ -360,9 +360,35 @@ function SwapOffer({ swap, missed, date, rows, onSwap }: {
   )
 }
 
+/** The later days of this week the session can move to (2026-11-11: "It needs to be able to
+ *  handle it"): the two days trade, so this day gets what the picked day holds now. Only the
+ *  days the engine allows, each with its warnings; nothing while a swap waits to be sent. */
+function MoveOffer({ moves, date, rows, onMove }: {
+  moves: Schemas['MoveOffer'][]; date: string; rows: OutboxRow[]; onMove: (date: string, to: string) => void
+}) {
+  const open = moves.filter((m) => m.available)
+  if (waiting(rows, 'swap') || open.length === 0) return null
+  return (
+    <section className="card group" data-testid="move">
+      <h3 className="eyebrow">{S.week.moveTitle}</h3>
+      <p className="caption">{S.week.moveIntro}</p>
+      {open.map((m) => (
+        <div key={m.date} className="group">
+          <button className="btn btn--glass btn--wide" data-testid={`move-${m.date}`} onClick={() => onMove(date, m.date)}>
+            {S.week.moveTo(longDate(m.date), m.holds)}
+          </button>
+          {m.warnings.map((w) => <p key={w} className="alert">{w}</p>)}
+        </div>
+      ))}
+    </section>
+  )
+}
+
 /** Another day than today, picked in the strip (T19): its rest, done, missed or future view.
  *  Today's view is the session overview (screens/TrainingTab.tsx). */
-export function DayView({ day, rows, onSwap }: { day: DayAnswer; rows: OutboxRow[]; onSwap: (date: string) => void }) {
+export function DayView({ day, rows, onSwap, onMove }: {
+  day: DayAnswer; rows: OutboxRow[]; onSwap: (date: string) => void; onMove?: (date: string, to: string) => void
+}) {
   const head = (
     <>
       <p className="eyebrow" data-testid="day-overline">{longDate(day.date)}</p>
@@ -385,6 +411,7 @@ export function DayView({ day, rows, onSwap }: { day: DayAnswer; rows: OutboxRow
           {head}
           {day.planned && <PlannedView planned={day.planned} missed={day.route === 'past_missed'} date={day.date} />}
           {day.swap && <SwapOffer swap={day.swap} missed={day.route === 'past_missed'} date={day.date} rows={rows} onSwap={onSwap} />}
+          {day.moves && onMove && <MoveOffer moves={day.moves} date={day.date} rows={rows} onMove={onMove} />}
         </div>
       )
     default:

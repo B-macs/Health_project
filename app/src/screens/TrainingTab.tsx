@@ -21,7 +21,7 @@ import { useApp } from '../lib/appState'
 import { useCached, type View } from '../lib/cache'
 import { useToday } from '../lib/day'
 import {
-  answerCarry, answerShift, clearRefused, gate1Flare, gate1Reason, redoWeek, swapWithToday, useConfirmed,
+  answerCarry, answerShift, clearRefused, gate1Flare, gate1Reason, moveToDay, redoWeek, swapWithToday, useConfirmed,
   useScheduleAnswers,
 } from '../lib/schedule'
 import { endSession, startSession } from '../lib/session'
@@ -309,6 +309,11 @@ function WeekBody({ tiles, weekStart, setWeekStart, homeWeek, setHomeWeek, selec
     setSelected(today)
     answer(`swap:${date}`, () => swapWithToday(store, date))
   }
+  // A move between two later days leaves today as it is: the page shows the day it moved to.
+  const move = (date: string, to: string) => {
+    setSelected(to)
+    answer(`move:${date}`, () => moveToDay(store, date, to))
+  }
   // The week strip leads the page, right under the title, and nothing goes above it (the
   // owner, 2026-10-21: "Move the week tab to the top of the page in training", and 2026-10-28:
   // "Make the week dates at the top of the page always, nothing goes above them"). The two
@@ -337,7 +342,7 @@ function WeekBody({ tiles, weekStart, setWeekStart, homeWeek, setHomeWeek, selec
       {selected === today
         ? <Overview day={day} onStart={onStart} starting={starting} waitingMove={waitingMove} movedAt={movedAt} />
         : day.data && day.data.date === selected
-          ? <DayView day={day.data} rows={rows} onSwap={swap} />
+          ? <DayView day={day.data} rows={rows} onSwap={swap} onMove={move} />
           : <Freshness view={day} />}
       {ok && (
         <>

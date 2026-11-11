@@ -183,6 +183,29 @@ describe('a day', () => {
     expect(html).toContain(S.week.swapFuture)
   })
 
+  it('a future day offers the later days it can move to, each with what it holds now', () => {
+    // The owner, 2026-11-11: "if I move Friday training of this week C to tomorrow ... It
+    // needs to be able to handle it."
+    const thursday = fx.addDays(MONDAY, 3)
+    const moves = [
+      { date: fx.addDays(MONDAY, 2), holds: 'rest day', available: true, blockers: [],
+        warnings: ['Made-up warning: two hard days back to back.'] },
+      { date: fx.addDays(MONDAY, 5), holds: 'session D', available: false, blockers: ['made-up'], warnings: [] },
+    ]
+    const html = text(draw(<DayView day={{ ...day(thursday), moves }} rows={[]} onSwap={() => undefined}
+      onMove={() => undefined} />))
+    expect(html).toContain(S.week.moveTitle)
+    expect(html).toContain(S.week.moveIntro)
+    expect(html).toContain(S.week.moveTo(longDate(moves[0].date), 'rest day'))
+    expect(html).toContain('Made-up warning: two hard days back to back.')
+    expect(html).not.toContain(S.week.moveTo(longDate(moves[1].date), 'session D'))
+    const sent = text(draw(<DayView day={{ ...day(thursday), moves }} rows={[outboxRow('swap', 'waiting')]}
+      onSwap={() => undefined} onMove={() => undefined} />))
+    expect(sent).not.toContain(S.week.moveTitle)
+    expect(text(draw(<DayView day={{ ...day(thursday), moves: [] }} rows={[]} onSwap={() => undefined}
+      onMove={() => undefined} />))).not.toContain(S.week.moveTitle)
+  })
+
   it('a blocked swap says why and offers no button; a waiting swap says it waits', () => {
     const thursday = fx.addDays(MONDAY, 3)
     const blocked = text(draw(<DayView day={day(thursday, ['blocked'])} rows={[]} onSwap={() => undefined} />))

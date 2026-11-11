@@ -3513,6 +3513,47 @@
         "title": "MissingIn",
         "type": "object"
       },
+      "MoveOffer": {
+        "description": "A later day of the same week this day's session may move to\n(2026-11-11): what that day holds now (the day left behind gets it), and\nwhy it is blocked or what to keep in view.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "holds": {
+            "title": "Holds",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "date",
+          "holds",
+          "available",
+          "blockers",
+          "warnings"
+        ],
+        "title": "MoveOffer",
+        "type": "object"
+      },
       "MovementStrip": {
         "properties": {
           "bands": {
@@ -7797,6 +7838,18 @@
             "format": "date",
             "title": "Date",
             "type": "string"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
           }
         },
         "required": [
@@ -8331,7 +8384,7 @@
         "type": "object"
       },
       "TrainingDayOut": {
-        "description": "`route`: rest, past_completed (with `logged`; None when its detail could\nnot be read), past_missed and future (with `planned` and `swap`), today\n(with `overview`), no_phase (with `gap`) or phases_unreadable.",
+        "description": "`route`: rest, past_completed (with `logged`; None when its detail could\nnot be read), past_missed and future (with `planned`, `swap` and `moves`),\ntoday (with `overview`), no_phase (with `gap`) or phases_unreadable.",
         "properties": {
           "date": {
             "format": "date",
@@ -8357,6 +8410,20 @@
                 "type": "null"
               }
             ]
+          },
+          "moves": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MoveOffer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moves"
           },
           "note": {
             "anyOf": [
@@ -13763,6 +13830,7 @@
     },
     "/api/training/swap": {
       "post": {
+        "description": "Another day's session onto today, or onto `to`, a later day of the\nsame week (2026-11-11); the day left behind gets what the target held.",
         "operationId": "post_swap_api_training_swap_post",
         "parameters": [
           {

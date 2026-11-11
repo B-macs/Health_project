@@ -86,7 +86,7 @@ export function week(day: string, local: string): Schemas['TodayWeekOut'] {
 }
 
 export function trainingDay(day: string, local: string, scenario: ReadonlySet<string> = new Set()): Schemas['TrainingDayOut'] {
-  const base = { date: day, gap: null, logged: null, note: null, overview: null, phase: null, phases_error: null, planned: null, rest: null, swap: null }
+  const base = { date: day, gap: null, logged: null, note: null, overview: null, phase: null, phases_error: null, planned: null, rest: null, swap: null, moves: null }
   if (scenario.has('unreadable')) return { ...base, route: 'phases_unreadable', phases_error: 'made-up' }
   if (scenario.has('gap')) return { ...base, route: 'no_phase', gap: gapOf(local) }
   if (day !== local) {
@@ -106,6 +106,11 @@ export function trainingDay(day: string, local: string, scenario: ReadonlySet<st
       swap: scenario.has('blocked')
         ? { available: false, check_failed: false, blockers: ['made-up: today already has a logged session'], warnings: [], today_objective: '' }
         : { available: true, check_failed: false, blockers: [], warnings: missed ? [] : ['Made-up warning: two main sessions in a row.'], today_objective: session.objective },
+      // The later days of the same week it can move to (2026-11-11).
+      moves: Array.from({ length: 6 }, (_, i) => addDays(local, i + 1))
+        .filter((d) => d !== day && mondayOf(d) === mondayOf(day))
+        .map((d) => ({ date: d, holds: markerOf(d, local) === 'rest' ? 'rest day' : `Made-up session ${weekday(d) + 1}`,
+          available: true, blockers: [], warnings: [] })),
     }
   }
   // Today's overview is the session fixture's own day (dev/session_fixture.json, made by the

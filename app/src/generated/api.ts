@@ -924,7 +924,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Post Swap */
+        /**
+         * Post Swap
+         * @description Another day's session onto today, or onto `to`, a later day of the
+         *     same week (2026-11-11); the day left behind gets what the target held.
+         */
         post: operations["post_swap_api_training_swap_post"];
         delete?: never;
         options?: never;
@@ -2187,6 +2191,27 @@ export interface components {
         MissingIn: {
             /** Entries */
             entries: components["schemas"]["MissingEntry"][];
+        };
+        /**
+         * MoveOffer
+         * @description A later day of the same week this day's session may move to
+         *     (2026-11-11): what that day holds now (the day left behind gets it), and
+         *     why it is blocked or what to keep in view.
+         */
+        MoveOffer: {
+            /** Available */
+            available: boolean;
+            /** Blockers */
+            blockers: string[];
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Holds */
+            holds: string;
+            /** Warnings */
+            warnings: string[];
         };
         /** MovementStrip */
         MovementStrip: {
@@ -3591,6 +3616,8 @@ export interface components {
              * Format: date
              */
             date: string;
+            /** To */
+            to?: string | null;
         };
         /** SwapOffer */
         SwapOffer: {
@@ -3769,8 +3796,8 @@ export interface components {
         /**
          * TrainingDayOut
          * @description `route`: rest, past_completed (with `logged`; None when its detail could
-         *     not be read), past_missed and future (with `planned` and `swap`), today
-         *     (with `overview`), no_phase (with `gap`) or phases_unreadable.
+         *     not be read), past_missed and future (with `planned`, `swap` and `moves`),
+         *     today (with `overview`), no_phase (with `gap`) or phases_unreadable.
          */
         TrainingDayOut: {
             /**
@@ -3780,6 +3807,8 @@ export interface components {
             date: string;
             gap?: components["schemas"]["GapScreen"] | null;
             logged?: components["schemas"]["LoggedSession"] | null;
+            /** Moves */
+            moves?: components["schemas"]["MoveOffer"][] | null;
             note?: components["schemas"]["ScheduleNote"] | null;
             overview?: components["schemas"]["TodayOverview"] | null;
             phase?: components["schemas"]["PhaseOut"] | null;

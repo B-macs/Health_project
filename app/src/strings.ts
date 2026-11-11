@@ -478,6 +478,10 @@ export const S = {
     swapFuture: 'Do this session today',
     swapBlocked: (why: string) => `Swap with today isn’t available: ${why}`,
     swapCheckFailed: 'Couldn’t check the logged sessions just now, so the swap is not offered. Open the day again later.',
+    // A move to a later day of the week (2026-11-11): the two days trade.
+    moveTitle: 'Move to another day',
+    moveIntro: 'Pick a day of this week. That day gets this session, and this day gets what that day holds now.',
+    moveTo: (day: string, holds: string) => `${day} · now ${holds}`,
     rest: 'Rest day.',
     restOptional: 'Optional active rest',
     restTrainAnyway: 'To train anyway, open any other day in the strip above and swap it onto today.',

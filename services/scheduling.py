@@ -251,63 +251,92 @@ def declined_entries(phase: Phase, dates: list[date],
 # machinery never would — so the rules that HARD-gate the automatic carry
 # (strict priority, spacing, the same-week horizon, deferral-only direction)
 # demote to WARNINGS here. Only structural impossibilities block.
+#
+# THE TARGET MAY BE ANY LATER DAY OF THE WEEK (the athlete, 2026-11-11: "if I
+# move Friday training of this week C to tomorrow, the Friday becomes the rest
+# day and mobility goes to tomorrow evening instead of tonight, and D training
+# stays on Saturday morning ... It needs to be able to handle it"). `target`
+# names the day the session moves to; None is today, the first form of the
+# swap. The two days trade their plan days, so the day left behind gets what
+# the target day held. The week check stays at the write (Key Rule 18b).
 
 def manual_swap_blockers(phase: Phase, other_date: date, today: date,
-                         logged_dates: set[str]) -> list[str]:
+                         logged_dates: set[str], target: date | None = None) -> list[str]:
     """DETERMINISTIC. Why a user-requested swap of another plan day with
-    today CANNOT happen — empty means it can. Blockers are structural
-    impossibilities only (a day already performed, a today that already
-    trained, a date the plan doesn't cover); judgement calls belong to
+    today (or with `target`, a later day) CANNOT happen — empty means it can.
+    Blockers are structural impossibilities only (a day already performed, a
+    target that already trained, a target before today, a date the plan doesn't cover);
+    judgement calls belong to
     manual_swap_warnings, because the explicit choice IS the permission.
     A forced-rest today (0 override) is deliberately NOT a blocker — the
     athlete's own rest record yields to the athlete's own click (it warned
     the live 2026-08-09 swap attempt into a dead end when it blocked).
     logged_dates must be the PLAN-day (yoga-excluding) set: a yoga session
     on either date must not block the athlete's own tool."""
+    target = today if target is None else target
+    where = "Today" if target == today else "That day"
     blockers: list[str] = []
-    if other_date == today:
-        blockers.append("Pick a day other than today to swap with.")
+    if other_date == target:
+        blockers.append("Pick a day other than today to swap with." if target == today
+                        else "Pick a different day to move the session to.")
+    if target < today:
+        blockers.append("A session can move only to today or a later day.")
     if other_date.isoformat() in logged_dates:
         blockers.append("That day already has a logged session — there is nothing to move.")
-    if today.isoformat() in logged_dates:
-        blockers.append("Today already has a logged session — nothing can move onto it.")
+    if target.isoformat() in logged_dates:
+        blockers.append(f"{where} already has a logged session — nothing can move onto it.")
     if not (1 <= plan.day_number_in_phase(phase, other_date) <= phase.length_days):
         blockers.append("That day is outside the current plan.")
-    today_num = plan.day_number_in_phase(phase, today)
-    if not (1 <= today_num <= phase.length_days) \
-            and phase.date_overrides.get(today.isoformat()) != 0:
-        blockers.append("Today is outside the current plan.")
+    target_num = plan.day_number_in_phase(phase, target)
+    if not (1 <= target_num <= phase.length_days) \
+            and phase.date_overrides.get(target.isoformat()) != 0:
+        blockers.append(f"{where} is outside the current plan.")
     return blockers
 
 
 def manual_swap_warnings(phase: Phase, plan_dict: dict | None,
-                         other_date: date, today: date) -> list[str]:
+                         other_date: date, today: date,
+                         target: date | None = None) -> list[str]:
     """DETERMINISTIC. Advisory cautions for a user-requested swap — shown
     beside the button, never blocking it. These are the exact rules the
     automatic carry enforces hard (strict priority, main/test spacing),
-    restated as consequences so the athlete decides with them in view."""
+    restated as consequences so the athlete decides with them in view.
+    The neighbours are read as they will be after the swap: the day a session
+    leaves is not its own neighbour."""
+    target = today if target is None else target
+    where = "Today" if target == today else "That day"
     warnings: list[str] = []
     plan_dict = plan_dict or {}
 
     def _type_at(d: date) -> str | None:
         return day_type(plan_dict.get(plan.day_number_in_phase(phase, d)))
 
-    incoming = _type_at(other_date)    # what the swap brings to today
-    outgoing = _type_at(today)         # what it sends to the other date
-    if phase.date_overrides.get(today.isoformat()) == 0:
+    incoming = _type_at(other_date)    # what the swap brings to the target
+    outgoing = _type_at(target)        # what it sends to the other date
+
+    def _after(d: date) -> str | None:
+        if d == target:
+            return incoming
+        if d == other_date:
+            return outgoing
+        return _type_at(d)
+
+    if phase.date_overrides.get(target.isoformat()) == 0:
         warnings.append(
-            "Today is set as a forced rest day — the swap replaces it, and "
+            f"{where} is set as a forced rest day — the swap replaces it, and "
             "the rest day moves onto the other date instead."
         )
     if other_date < today and incoming is not None and outgoing is not None \
             and not can_overwrite(incoming, outgoing):
         warnings.append(
-            "Today's session is not lower priority than the missed one — "
-            "the swap records today's session as the one that was missed."
+            f"{where}'s session is not lower priority than the missed one — "
+            f"the swap records {where.lower()}'s session as the one that was missed."
         )
-    prev_t = _type_at(today - timedelta(days=1))
-    next_t = _type_at(today + timedelta(days=1))
-    if incoming == "main" and ("main" in (prev_t, next_t)):
+    prev_t = _after(target - timedelta(days=1))
+    next_t = _after(target + timedelta(days=1))
+    left_behind = other_date >= today and outgoing == "main" and "main" in (
+        _after(other_date - timedelta(days=1)), _after(other_date + timedelta(days=1)))
+    if (incoming == "main" and ("main" in (prev_t, next_t))) or left_behind:
         warnings.append(
             "This puts two hard training days back to back — the plan keeps them apart."
         )
@@ -324,24 +353,46 @@ def manual_swap_warnings(phase: Phase, plan_dict: dict | None,
     return warnings
 
 
-def manual_swap_entries(phase: Phase, other_date: date,
-                        today: date) -> tuple[dict[str, int], dict[str, str]]:
+def manual_swap_entries(phase: Phase, other_date: date, today: date,
+                        target: date | None = None) -> tuple[dict[str, int], dict[str, str]]:
     """DETERMINISTIC. The swap the athlete asked for: the other date and
-    today trade day-numbers — the same honest-accounting swap the automatic
-    carry uses. With a PAST day, the displaced session becomes the one that
-    reads as missed; with a FUTURE day, the displaced session is postponed
-    to that date and nothing is lost. A forced-rest today trades its 0 onto
-    the other date. The reasons on both dates carry no no-movement prefix
-    (this IS a move, the banner should say so) and close both automatic
+    today (or `target`) trade day-numbers — the same honest-accounting swap
+    the automatic carry uses. With a PAST day, the displaced session becomes
+    the one that reads as missed; with a FUTURE day, the displaced session is
+    postponed to that date and nothing is lost. A forced-rest target trades
+    its 0 onto the other date. The reasons on both dates carry no no-movement
+    prefix (this IS a move, the banner should say so) and close both automatic
     schedulers' guards, so neither ever re-proposes either date."""
+    target = today if target is None else target
     other_num = plan.day_number_in_phase(phase, other_date)
-    today_num = plan.day_number_in_phase(phase, today)
-    overrides = {other_date.isoformat(): today_num, today.isoformat(): other_num}
+    target_num = plan.day_number_in_phase(phase, target)
+    overrides = {other_date.isoformat(): target_num, target.isoformat(): other_num}
     reasons = {
-        other_date.isoformat(): f"Swapped with {today.isoformat()} by choice",
-        today.isoformat(): f"Swapped with {other_date.isoformat()} by choice",
+        other_date.isoformat(): f"Swapped with {target.isoformat()} by choice",
+        target.isoformat(): f"Swapped with {other_date.isoformat()} by choice",
     }
     return overrides, reasons
+
+
+def manual_move_targets(phase: Phase, other_date: date, today: date) -> list[date]:
+    """DETERMINISTIC. The days a session on `other_date` may move to besides
+    today: the later days of its own week (Key Rule 18b), after today, inside
+    the block. Today is the first form of the swap ("Do this session today")."""
+    sunday = _week_sunday(other_date)
+    out, d = [], today + timedelta(days=1)
+    while d <= sunday:
+        if d != other_date and 1 <= plan.day_number_in_phase(phase, d) <= phase.length_days \
+                and d - timedelta(days=d.weekday()) == other_date - timedelta(days=other_date.weekday()):
+            out.append(d)
+        d += timedelta(days=1)
+    return out
+
+
+def day_name(content: dict | None) -> str:
+    """A plan day in the screen's words: its session letter, the flexibility
+    session, a rest day, or its objective."""
+    name = _day_name(content)
+    return (content or {}).get("objective") or name if name == "the session" else name
 
 
 def swap_pairs_for_shift(phase: Phase, from_date: date, plan_dict: dict) -> dict[str, int]:
