@@ -480,8 +480,9 @@ class ReplacementOut(BaseModel):
 
 
 class SessionPlanOut(BaseModel):
-    """`kind`: plan, accessory, daily (the daily tendon session, WP-40) or egym
-    (the EGYM session, 2026-11-08)."""
+    """`kind`: plan, accessory, daily (the daily tendon session, WP-40), egym
+    (the EGYM session, 2026-11-08) or mobility (the evening mobility session,
+    2026-11-11)."""
     kind: str
     date: date
     day_num: int | None
@@ -509,8 +510,8 @@ class SessionPlanOut(BaseModel):
     note: str = ""
     #: Each lift's swap when its equipment is in use (WP-28); none on most days.
     alternatives: list[SessionAlternative] = []
-    #: The daily tendon session only (WP-40): the 8-hour line, and whether a
-    #: daily session is already logged today.
+    #: The daily tendon session only (WP-40): the 8-hour line. The daily and the
+    #: evening mobility session: whether one of its kind is already logged today.
     reminder: DailyReminder | None = None
     done_today: bool = False
 

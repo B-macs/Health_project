@@ -648,9 +648,11 @@ export interface paths {
         };
         /**
          * Get Daily
-         * @description The daily tendon session (WP-40): the same session every day, its
-         *     8-hour line and whether it is done today. Never refused for the time of
-         *     day: when to do it is the athlete's decision.
+         * @description The Training tab's second tile: on the evening of a strength day with
+         *     no strength the next day, the evening mobility session (kind mobility,
+         *     2026-11-11); on every other day the daily tendon session (WP-40) with its
+         *     8-hour line. Either says whether it is done today. Never refused for the
+         *     time of day: when to do it is the athlete's decision.
          */
         get: operations["get_daily_api_training_daily_get"];
         put?: never;
@@ -3033,8 +3035,9 @@ export interface components {
         };
         /**
          * SessionPlanOut
-         * @description `kind`: plan, accessory, daily (the daily tendon session, WP-40) or egym
-         *     (the EGYM session, 2026-11-08).
+         * @description `kind`: plan, accessory, daily (the daily tendon session, WP-40), egym
+         *     (the EGYM session, 2026-11-08) or mobility (the evening mobility session,
+         *     2026-11-11).
          */
         SessionPlanOut: {
             adaptation: components["schemas"]["Adaptation"];

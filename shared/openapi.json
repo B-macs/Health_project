@@ -6146,7 +6146,7 @@
         "type": "object"
       },
       "SessionPlanOut": {
-        "description": "`kind`: plan, accessory, daily (the daily tendon session, WP-40) or egym\n(the EGYM session, 2026-11-08).",
+        "description": "`kind`: plan, accessory, daily (the daily tendon session, WP-40), egym\n(the EGYM session, 2026-11-08) or mobility (the evening mobility session,\n2026-11-11).",
         "properties": {
           "adaptation": {
             "$ref": "#/components/schemas/Adaptation"
@@ -12638,7 +12638,7 @@
     },
     "/api/training/daily": {
       "get": {
-        "description": "The daily tendon session (WP-40): the same session every day, its\n8-hour line and whether it is done today. Never refused for the time of\nday: when to do it is the athlete's decision.",
+        "description": "The Training tab's second tile: on the evening of a strength day with\nno strength the next day, the evening mobility session (kind mobility,\n2026-11-11); on every other day the daily tendon session (WP-40) with its\n8-hour line. Either says whether it is done today. Never refused for the\ntime of day: when to do it is the athlete's decision.",
         "operationId": "get_daily_api_training_daily_get",
         "parameters": [
           {

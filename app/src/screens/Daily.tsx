@@ -13,6 +13,10 @@
 //   own kind, so it never marks the training day done. Its 8-hour line is a reminder only:
 //   Start is never locked ("Reminder only let me make the desicion on when to do it and
 //   never locked"). Every number and word is the engine's or strings.ts's.
+// - The evening mobility session (2026-11-11): on the evening of a strength day with no
+//   strength the next day the engine answers the same address with kind 'mobility' ("The
+//   mobility training will replace the tendon training on those days"). The engine decides
+//   the day; the phone only shows the answer, with its own title and no gelatin line.
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import type { components } from '../generated/api'
@@ -62,6 +66,12 @@ function Tile({ title, line, note, testId, current, onOpen }: {
   )
 }
 
+/** The second tile's title: the evening mobility session on its evenings, else the daily
+ *  tendon session. */
+export function secondTileTitle(plan: Plan | null | undefined): string {
+  return plan?.kind === 'mobility' ? S.daily.mobilityTitle : S.daily.dailyTitle
+}
+
 /** The two tiles, side by side, under the week page's week dates. */
 export function TrainingTiles({ onTrainingDay }: { onTrainingDay: () => void }) {
   const { store, ctx, go } = useApp()
@@ -74,22 +84,24 @@ export function TrainingTiles({ onTrainingDay }: { onTrainingDay: () => void }) 
     <div className="pair tiles" data-testid="training-tiles">
       <Tile title={S.daily.trainingDay} testId="tile-training-day" current onOpen={onTrainingDay}
         line={trainingDayLine(day.data, savedOn, today)} note={null} />
-      <Tile title={S.daily.dailyTitle} testId="tile-daily" onOpen={() => go('/training/daily')}
+      <Tile title={secondTileTitle(d)} testId="tile-daily" onOpen={() => go('/training/daily')}
         line={d?.done_today ? S.daily.doneToday : S.daily.minutes(d?.model_minutes ?? null)}
         note={reminderLine(d?.reminder)} />
     </div>
   )
 }
 
-/** The daily session before Start: the entries, the 8-hour line, the gelatin line, the
- *  effort and pain rules, each item's how-to, and Start (never locked). */
+/** The second tile's session before Start: the entries, the 8-hour line and the gelatin line
+ *  (the tendon session only), the note, each item's how-to, and Start (never locked). */
 export function DailyOverview() {
   const { store, ctx, go } = useApp()
   const view = useCached<Plan>(store, DAILY, null, ctx, { today: true })
   const busy = useLiveQuery(async () => (await store.session.get('current')) !== undefined, [store], false)
   const [starting, setStarting] = useState(false)
   const today = localDay()
-  const plan = view.data && view.data.date === today && view.data.kind === 'daily' ? view.data : null
+  const plan = view.data && view.data.date === today
+    && (view.data.kind === 'daily' || view.data.kind === 'mobility') ? view.data : null
+  const mobility = plan?.kind === 'mobility'
   const start = async () => {
     if (!plan || starting) return
     setStarting(true)
@@ -108,8 +120,9 @@ export function DailyOverview() {
   return (
     <div className="screen train" data-testid="daily">
       <div className="sky" aria-hidden="true" />
-      <Head title={S.daily.dailyTitle} back={S.session.title} onBack={() => go('/training')}
-        caption={plan ? S.daily.rounds(plan.exercises.length, plan.model_minutes) : undefined} />
+      <Head title={secondTileTitle(plan)} back={S.session.title} onBack={() => go('/training')}
+        caption={!plan ? undefined : mobility ? S.daily.mobilityCaption(plan.exercises.length, plan.model_minutes)
+          : S.daily.rounds(plan.exercises.length, plan.model_minutes)} />
       <Freshness view={view} />
       {busy && <p className="alert" data-testid="daily-blocked">{S.daily.blocked}</p>}
       {!plan ? (
@@ -118,7 +131,7 @@ export function DailyOverview() {
         <>
           {plan.done_today && <p className="note" data-testid="daily-done">{S.daily.doneToday}</p>}
           {line && <p className="note" data-testid="daily-reminder">{line}</p>}
-          <p className="caption">{S.daily.gelatin}</p>
+          {!mobility && <p className="caption">{S.daily.gelatin}</p>}
           {plan.note && <p className="caption" data-testid="daily-note">{plan.note}</p>}
           <Timeline title={S.session.workout} items={plan.exercises.map((e) => ({
             name: e.name, type: e.type, icon: e.icon, prescription: e.prescription, laterality: e.laterality ?? null, mechanics: e.mechanics,

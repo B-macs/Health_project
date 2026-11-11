@@ -8,8 +8,11 @@ next monday"*).
 
 THE WEEK. Strength on Monday, Tuesday, Thursday and Friday — sessions A, B, C
 and D, every one full body — rest on Wednesday and Saturday, and the
-flexibility session on Sunday. A, B and C meet the weekly dose; D is the bonus.
-No running: running waits for gate 1 (goal A, stage 1).
+flexibility session on Sunday in weeks 1-3. From week 4 the flexibility work is
+the evening mobility session (EVENING_MOBILITY_FROM_WEEK): the same stack, on
+the evening of each strength day with no strength the next day, and Sunday is a
+rest day. A, B and C meet the weekly dose; D is the bonus. No running: running
+waits for gate 1 (goal A, stage 1).
 
 WHERE THE SESSIONS COME FROM. goal_week.py holds a card for every exercise and
 services/placement.py places the cards by fixed rules; the four sessions below
@@ -767,6 +770,18 @@ EGYM_D_FROM_WEEK = 4
 LETTER_BY_WEEKDAY = {0: "A", 1: "B", 3: "C", 4: "D"}
 REST_WEEKDAYS = (2, 5)
 FLEXIBILITY_WEEKDAY = 6
+#: From this week of the block, the flexibility stack runs in the EVENING of a
+#: strength day, not on Sunday morning. The athlete, 2026-11-11, from the
+#: flexibility blueprint's second-best slot ("Same day, evening, after morning
+#: training"): "strength training in the morning and mobilty in the evening,
+#: lets schedule it on the days I have no strength training the next day ...
+#: The mobility training will replace the tendon training on those days." His
+#: two answers the same day: "Two evenings, no Sunday" (the blueprint's limit is
+#: one or two flexibility sessions a week, so the Sunday session stops and its
+#: day is a rest day) and "Follow the rule" (the evening follows the scheduled
+#: days, services/mobility_session.is_due: Tuesday and Friday in a normal week).
+#: Weeks 1-3 keep the Sunday he ran (2026-10-25 is logged as plan day 7).
+EVENING_MOBILITY_FROM_WEEK = 4
 
 
 # ─── The test items ──────────────────────────────────────────────────────────
@@ -998,11 +1013,28 @@ def _flexibility_day(week: int) -> dict:
     }
 
 
+def evening_mobility_day() -> dict:
+    """The evening mobility session from week 4 (EVENING_MOBILITY_FROM_WEEK):
+    the Sunday session's stack, the prescription for the last reading, with no
+    retest. Not a plan day: services/mobility_session.py offers it on the
+    evening of a strength day and stores it under its own Type."""
+    return {
+        "objective": "Evening mobility — Adductors and Hip Rotators",
+        "phase": BLOCK_NAME,
+        "session_rpe_target": 4,
+        "is_gym_session": False,
+        "day_type": "stretch",
+        "session_kind": "flexibility",
+        "exercises": list(FLEX_STACK),
+        "home": [],
+    }
+
+
 def _day(day: int) -> dict:
     week, weekday = (day - 1) // 7 + 1, (day - 1) % 7
     if weekday in LETTER_BY_WEEKDAY:
         return _strength_day(LETTER_BY_WEEKDAY[weekday], week)
-    if weekday == FLEXIBILITY_WEEKDAY:
+    if weekday == FLEXIBILITY_WEEKDAY and week < EVENING_MOBILITY_FROM_WEEK:
         return _flexibility_day(week)
     return _rest_day(week)
 

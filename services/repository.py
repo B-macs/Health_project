@@ -2652,7 +2652,10 @@ class Repository:
     #: reschedule logic — only its own literal on the write.
     #: "EGYM" (2026-11-08): the circuit on the "+" menu (services/egym_session.py)
     #: is extra to the plan day, and it IS a logged day (his answer of 2026-11-08).
-    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor", "Accessory", "Daily", "EGYM"})
+    #: "Evening Mobility" (2026-11-11): the stack on the evening of a strength day
+    #: (services/mobility_session.py); the morning's strength session is the plan day.
+    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset(
+        {"Yoga", "Outdoor", "Accessory", "Daily", "EGYM", "Evening Mobility"})
 
     #: Types that never make a date a LOGGED DAY, whatever the caller counts
     #: (WP-40, the athlete's decision of 2026-10-28). The daily tendon session
@@ -2660,7 +2663,10 @@ class Repository:
     #: and the failed-week rule (0-2 logged days, Key Rule 22) could never
     #: fire; the week strip would mark a rest day done. It still counts in
     #: strain and the load ratio (Foster AU) — only the day count leaves it out.
-    NOT_A_TRAINING_DAY_TYPES: frozenset[str] = frozenset({"Daily"})
+    #: The evening mobility session (2026-11-11) runs on the evening of a strength
+    #: day: counted, an evening session alone would mark a skipped strength day
+    #: done. The strength session makes the day.
+    NOT_A_TRAINING_DAY_TYPES: frozenset[str] = frozenset({"Daily", "Evening Mobility"})
 
     def has_logged_session(self, d: date) -> bool:
         """True only for a logged rehab-plan session — a logged Yoga,

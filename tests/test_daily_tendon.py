@@ -174,7 +174,8 @@ def test_the_daily_kind_is_stored_under_its_own_type():
 
 def test_the_daily_type_never_marks_a_plan_day_and_never_makes_a_logged_day():
     assert dly.DAILY_TYPE in Repository.SUPPLEMENTARY_SESSION_TYPES
-    assert Repository.NOT_A_TRAINING_DAY_TYPES == frozenset({dly.DAILY_TYPE})
+    # The evening mobility session joined it on 2026-11-11 (tests/test_mobility_session.py).
+    assert Repository.NOT_A_TRAINING_DAY_TYPES == frozenset({dly.DAILY_TYPE, "Evening Mobility"})
 
 
 def test_a_week_of_daily_sessions_and_two_gym_days_still_fails():

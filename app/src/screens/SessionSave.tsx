@@ -290,7 +290,10 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
   const daily = s.plan.kind === 'daily'
   // The EGYM session (2026-11-08): extra to the plan day, so it never marks the day trained.
   const egym = s.plan.kind === 'egym'
-  const extra = accessory || daily || egym
+  // The evening mobility session (2026-11-11): the morning's strength session is the training
+  // day, so it never marks the day trained.
+  const mobility = s.plan.kind === 'mobility'
+  const extra = accessory || daily || egym || mobility
   // The EGYM machines' tonnage list: the "+" menu's session, and session D of the block from
   // week 4 (2026-11-11), which is a plan session and marks the day trained.
   const tonnage = s.plan.exercises.some((e) => e.tonnage_entry)
@@ -385,7 +388,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
         <div className="celebrate" aria-hidden="true" data-testid="celebrate"><IconCheck /></div>
         <header className="head">
           <h1 className="head__title">{accessory ? S.session.accessoryLogged : daily ? S.session.dailyLogged
-            : egym ? S.session.egymLogged : S.session.congrats}</h1>
+            : egym ? S.session.egymLogged : mobility ? S.session.mobilityLogged : S.session.congrats}</h1>
           {!extra && <div className="caption">{S.session.congratsNext(exerciseOrder(s).length)}</div>}
         </header>
         <section className="card group" role="status" data-testid="save-state" data-state={saved ?? 'waiting'}>
@@ -424,6 +427,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
         {accessory && <p className="caption">{S.session.accessoryEffortHelp}</p>}
         {daily && <p className="caption">{S.session.dailyEffortHelp}</p>}
         {egym && <p className="caption">{S.session.egymEffortHelp}</p>}
+        {mobility && <p className="caption">{S.session.mobilityEffortHelp}</p>}
       </section>
       {ask && (
         <section className="card group">

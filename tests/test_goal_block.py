@@ -79,15 +79,18 @@ def test_no_day_of_the_block_carries_a_home_item():
 
 def test_twelve_weeks_in_the_approved_shape():
     """Strength Monday, Tuesday, Thursday and Friday (A to D); rest Wednesday
-    and Saturday; flexibility Sunday (athlete, 2026-10-16: "yes agreed")."""
+    and Saturday; flexibility Sunday (athlete, 2026-10-16: "yes agreed") in
+    weeks 1-3. From week 4 the flexibility work is the evening mobility session
+    and Sunday is a rest day (athlete, 2026-11-11: "Two evenings, no Sunday")."""
     assert len(PLAN) == gb.WEEKS * 7 == 84
     assert sorted(PLAN) == list(range(1, 85))
+    assert gb.EVENING_MOBILITY_FROM_WEEK == 4
     for d, day in PLAN.items():
-        weekday = (d - 1) % 7
+        weekday, week = (d - 1) % 7, (d - 1) // 7 + 1
         if weekday in gb.LETTER_BY_WEEKDAY:
             assert day["day_type"] == "main" and day["shape"] == "full_body", d
             assert day["session_letter"] == gb.LETTER_BY_WEEKDAY[weekday], d
-        elif weekday == gb.FLEXIBILITY_WEEKDAY:
+        elif weekday == gb.FLEXIBILITY_WEEKDAY and week < gb.EVENING_MOBILITY_FROM_WEEK:
             assert day["session_kind"] == "flexibility" and day["day_type"] == "stretch", d
         else:
             assert day["day_type"] == "rest" and day["exercises"] == [], d
@@ -130,13 +133,18 @@ def test_the_six_exercise_cap_is_replaced_only_on_a_full_body_day():
     assert not s.session_shape_violations(PLAN[8])
 
 
-def test_the_weekly_count_is_five_sessions():
-    """Four strength sessions and one flexibility session: the stage-2 limit
-    of five (rules.STAGE_CONSTRAINTS)."""
+def test_the_weekly_count_is_five_sessions_then_four_with_two_evenings():
+    """Weeks 1-3: four strength sessions and one flexibility session, the
+    stage-2 limit of five (rules.STAGE_CONSTRAINTS). From week 4: four strength
+    days, and the flexibility stack on two of their evenings (2026-11-11). A
+    same-day evening session takes no calendar slot of its own
+    (docs/training/flexibility_integration_2026-08-16.md, step 1)."""
     limit = rules.STAGE_CONSTRAINTS[2]["session_freq_max"]
+    assert limit == 5
     for week in range(gb.WEEKS):
         days = [PLAN[week * 7 + i + 1] for i in range(7)]
-        assert sum(1 for day in days if day["exercises"]) == limit == 5, week + 1
+        want = 5 if week + 1 < gb.EVENING_MOBILITY_FROM_WEEK else 4
+        assert sum(1 for day in days if day["exercises"]) == want <= limit, week + 1
 
 
 # ─── What is not in the block ───────────────────────────────────────────────
@@ -434,7 +442,7 @@ def test_only_a_test_is_left_out_of_the_minutes():
 
 
 def test_the_sunday_tests_run_first_and_in_a_fixed_order():
-    for week in range(1, gb.WEEKS + 1):
+    for week in range(1, gb.EVENING_MOBILITY_FROM_WEEK):
         names = _names(PLAN[week * 7]["exercises"])
         want = []
         if week in gb.FLEX_RETEST_WEEKS:

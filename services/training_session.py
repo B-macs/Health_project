@@ -29,6 +29,7 @@ from services import egym_session as egs
 from services import equipment, replacements
 from services import flexibility_screen as fxs
 from services import guided_flow, prescription, session_order, session_save, strain_regions
+from services import mobility_session as mob
 from services import sessions as sess
 from services import supplementary_save
 from services import training_screen as ts
@@ -52,15 +53,16 @@ SUPPLEMENTARY_SAVE_LOCK = threading.Lock()
 
 #: The kinds of session the save takes: the plan day, the accessory session
 #: (the "+" button), the daily tendon session (the Training tab's second
-#: tile, WP-40) and the EGYM session (the "+" button, 2026-11-08), the last
-#: three stored under their own Type so they never mark a plan day done
+#: tile, WP-40), the EGYM session (the "+" button, 2026-11-08) and the evening
+#: mobility session (the second tile on its evenings, 2026-11-11), the last
+#: four stored under their own Type so they never mark a plan day done
 #: (Repository.SUPPLEMENTARY_SESSION_TYPES).
-PLAN, ACCESSORY, DAILY, EGYM = "plan", "accessory", "daily", "egym"
+PLAN, ACCESSORY, DAILY, EGYM, MOBILITY = "plan", "accessory", "daily", "egym", "mobility"
 
 #: The Type each kind's rows are stored under; a plan exercise keeps its own
 #: movement type (None).
 _STORED_TYPE = {PLAN: None, ACCESSORY: acc.ACCESSORY_TYPE, DAILY: dly.DAILY_TYPE,
-                EGYM: egs.EGYM_TYPE}
+                EGYM: egs.EGYM_TYPE, MOBILITY: mob.MOBILITY_TYPE}
 
 
 def _try(read, default):
@@ -427,16 +429,28 @@ def accessory_plan(repo, today: date) -> dict:
 
 
 def daily_plan(repo, today: date) -> dict:
-    """The daily tendon session for today (the Training tab's second tile,
-    WP-40): the same session every day, with its 8-hour line and whether it
-    is done today. It is offered on every day, a rest day and a day already
-    done included: when to do it is the athlete's decision, never a lock."""
+    """The Training tab's second tile for today. On the evening of a strength
+    day with no strength the next day it is the evening mobility session
+    (mobility_session.is_due, the athlete's rule of 2026-11-11: "The mobility
+    training will replace the tendon training on those days"); on every other
+    day the daily tendon session (WP-40), with its 8-hour line. Either one says
+    whether it is done today, and either is offered whatever was done: when to
+    do it is the athlete's decision, never a lock. Unreadable phases give the
+    tendon session, which runs on any day."""
     r = ts.read(repo, today)
     decided = ts.todays_decision(repo, r.phases, today)
+    day_sessions = dly.read_day_sessions(repo, today)
+    if not r.phases_error and mob.is_due(r.phases, today):
+        out = compose(repo, today, kind=MOBILITY, day_num=None, content=mob.build_day(),
+                      decided=decided)
+        out["next_day"] = None
+        out["note"] = mob.NOTE
+        out["reminder"] = None
+        out["done_today"] = mob.done_today(day_sessions)
+        return out
     out = compose(repo, today, kind=DAILY, day_num=None, content=dly.build_day(), decided=decided)
     out["next_day"] = None
     out["note"] = dly.dt.NOTE
-    day_sessions = dly.read_day_sessions(repo, today)
     out["reminder"] = dly.reminder(day_sessions, _plan_still_to_do(repo, r, today))
     out["done_today"] = dly.done_today(day_sessions)
     return out

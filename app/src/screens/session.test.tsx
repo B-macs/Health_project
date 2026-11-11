@@ -16,7 +16,7 @@ import {
   type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
-import { reminderLine, trainingDayLine } from './Daily'
+import { reminderLine, secondTileTitle, trainingDayLine } from './Daily'
 import { arrivalTimer, backLabel, SessionFlow } from './Session'
 import { HeartRateMatch, holdsDone, HOLD_MAX_MS, reviewLine, SessionSave, type Queued } from './SessionSave'
 import { Banner, longDate, noSessionLine, noSessionReason, TrainedToday, trainedToday } from './TrainingTab'
@@ -602,5 +602,33 @@ describe('session D of the block runs the EGYM machines (2026-11-11)', () => {
     const done = text(provide(<SessionSave s={saved} update={() => undefined} onDone={() => undefined} />))
     expect(done).toContain(S.session.congrats)
     expect(done).not.toContain(S.session.egymLogged)
+  })
+})
+
+// The owner, 2026-11-11: "The mobility training will replace the tendon training on those
+// days". The engine answers the second tile's address with kind 'mobility' on those evenings;
+// the phone shows that answer under its own title and saves it as an extra.
+describe('the evening mobility session (2026-11-11)', () => {
+  const daily = fx.dailyPlan('2026-10-20', new Set()) as unknown as Plan
+  const mobility = { ...daily, kind: 'mobility', reminder: null } as Plan
+
+  it('the second tile names the session the engine sent', () => {
+    expect(secondTileTitle(mobility)).toBe(S.daily.mobilityTitle)
+    expect(secondTileTitle(daily)).toBe(S.daily.dailyTitle)
+    expect(secondTileTitle(null)).toBe(S.daily.dailyTitle)
+  })
+
+  it('the save screen says it is the evening session and never the training day', () => {
+    let s: TrainingState = startSessionState(mobility, '2026-10-20-mob00001', mobility.exercises.map((_, i) => `mx-${i}`))
+    let t = T0
+    while (!finished(s)) { s = advance(s, t); t += 30_000 }
+    const unsaved = { ...s, saving: true }
+    const html = text(provide(<SessionSave s={unsaved} update={() => undefined} onDone={() => undefined} />))
+    expect(html).toContain(S.session.mobilityEffortHelp)
+    expect(html).not.toContain(S.session.dailyEffortHelp)
+    const saved = { ...unsaved, savedId: 'outbox-1', saved: { rpe: 4, minutes: 26, notes: '' } }
+    const done = text(provide(<SessionSave s={saved} update={() => undefined} onDone={() => undefined} />))
+    expect(done).toContain(S.session.mobilityLogged)
+    expect(done).not.toContain(S.session.congrats)
   })
 })

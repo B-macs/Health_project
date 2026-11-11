@@ -46,7 +46,7 @@ safety limit (`services/rules.py`, `session_freq_max` 5):
 
 | Stage | Week | Starts when |
 |---|---|---|
-| 1 | 4 strength + 1 flexibility, **no running** | 2026-10-14 |
+| 1 | 4 strength + 1 flexibility, **no running** (from 2026-11-11: 4 strength + 2 evening mobility sessions, see below) | 2026-10-14 |
 | 2 | 3 strength + 1 run + 1 flexibility (a trial) | Gate 1 passes |
 | 3 | 2 strength + 2 runs + 1 flexibility — the most running, ever | Gate 2 passes |
 
@@ -1063,6 +1063,21 @@ number two is correct"*).
    reading (pattern D) — tailor's pose, frog rocks, butterfly contract-relax,
    90/90 rotations with lift-offs (with the right-side cue), the triangle side
    split — built from the prescription and the exercise library, not copied.
+   **From week 4 (2026-11-11) it is the evening mobility session**: the same
+   stack on the evening of each strength day with no strength the next day,
+   and Sunday is a rest day. The athlete, from the flexibility blueprint's
+   second-best slot (same day, evening, after morning training): *"strength
+   training in the morning and mobilty in the evening, lets schedule it on the
+   days I have no strength training the next day ... The mobility training will
+   replace the tendon training on those days."* His two answers the same day:
+   *"Two evenings, no Sunday"* (the blueprint allows one or two flexibility
+   sessions a week) and *"Follow the rule"* (the evening follows the scheduled
+   days: Tuesday and Friday in a normal week; Wednesday and Friday in the week
+   of 2026-11-09, when D moved). `goal_block.EVENING_MOBILITY_FROM_WEEK`,
+   `services/mobility_session.py`. Stored under its own Type, "Evening
+   Mobility": an extra that never marks the plan day done and never makes a
+   logged day (it sits on a strength day), so a week now needs three strength
+   days (or an extra) to pass the failed-week rule. It counts in strain.
 3. **Test days.** The timed plank test in weeks 1 and 12, in place of session
    A's abs. The flexibility retest on the Sunday mornings of weeks 1 and 2,
    cold and first (weeks 1-3 until 2026-11-08, his rule that day: *"I dont

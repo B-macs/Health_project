@@ -151,9 +151,11 @@ def get_accessory(today: date = Depends(local_today),
 @router.get("/api/training/daily", response_model=SessionPlanOut)
 def get_daily(today: date = Depends(local_today),
               repo: Repository = Depends(get_repository)) -> dict:
-    """The daily tendon session (WP-40): the same session every day, its
-    8-hour line and whether it is done today. Never refused for the time of
-    day: when to do it is the athlete's decision."""
+    """The Training tab's second tile: on the evening of a strength day with
+    no strength the next day, the evening mobility session (kind mobility,
+    2026-11-11); on every other day the daily tendon session (WP-40) with its
+    8-hour line. Either says whether it is done today. Never refused for the
+    time of day: when to do it is the athlete's decision."""
     return _session(lambda: tsession.daily_plan(repo, today))
 
 

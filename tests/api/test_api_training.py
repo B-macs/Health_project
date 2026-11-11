@@ -409,6 +409,57 @@ def test_a_saved_daily_session_is_done_today_counts_in_strain_and_is_never_a_log
     assert any(r["date"] == WEDNESDAY.isoformat() and r["total_au"] > 0 for r in rows)
 
 
+def test_a_strength_day_before_a_rest_day_offers_the_evening_mobility_session(env, monkeypatch):
+    """The athlete, 2026-11-11: "strength training in the morning and mobilty in
+    the evening ... on the days I have no strength training the next day ...
+    The mobility training will replace the tendon training on those days."
+    Tuesday (B) is before Wednesday's rest: the second tile's address answers
+    with the Sunday stack, no 8-hour line and the plan's own time model."""
+    from services import mobility_session as mob
+    plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
+    assert plan["kind"] == "mobility" and plan["plan_days"] is None
+    assert [e["name"] for e in plan["exercises"]] == [e["name"] for e in gb.FLEX_STACK]
+    assert plan["reminder"] is None and plan["done_today"] is False and plan["note"] == mob.NOTE
+    assert plan["steps"] and 20 <= plan["model_minutes"] <= 30
+    assert plan["ask_length_above_minutes"] == sess.DURATION_CHECK_RATIO * plan["model_minutes"]
+    # Monday (A) is before Tuesday's strength: the daily tendon session.
+    assert env.ok(monkeypatch, "get", "/api/training/daily")["kind"] == "daily"
+
+
+def test_a_saved_evening_session_is_done_counts_in_strain_and_leaves_the_strength_day_open(
+        env, monkeypatch):
+    """Its own Type, an extra: the morning's strength session is still offered,
+    the evening alone never makes a logged day, and it counts in strain."""
+    from services import mobility_session as mob
+    plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
+    first = plan["exercises"][0]
+    body = {"session_id": f"{TUESDAY}-mob00001", "date": TUESDAY.isoformat(), "kind": "mobility",
+            "duration_minutes": 26, "session_rpe": 4, "exercises": [{
+                "exercise_id": "ex-mob-1", "exercise": first,
+                "sets": [{"set_num": i, "reps": 1, "weight": 0, "tut": 90,
+                          "ts": f"{TUESDAY}T19:0{i}:00"} for i in (1, 2, 3, 4)]}]}
+    env.ok(monkeypatch, "post", "/api/training/sessions", local=TUESDAY, body=body)
+    rows = [r for r in env.repo.get_all_training_exercises_raw()
+            if r["session_id"] == body["session_id"]]
+    assert [r["movement_type"] for r in rows] == [mob.MOBILITY_TYPE]
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)["done_today"]
+    assert not env.repo.has_logged_session(TUESDAY)
+    assert env.ok(monkeypatch, "get", "/api/training/session", local=TUESDAY)["kind"] == "plan"
+    week = (MONDAY, MONDAY + timedelta(days=6))
+    assert TUESDAY.isoformat() not in env.repo.get_logged_session_dates(*week)
+    assert TUESDAY.isoformat() not in env.repo.get_logged_session_dates_live(*week)
+    day = env.repo.get_daily_region_au(days=7, today=TUESDAY)["rows"]
+    assert any(r["date"] == TUESDAY.isoformat() and r["total_au"] > 0 for r in day)
+
+
+def test_from_week_4_sunday_is_a_rest_day(env, monkeypatch):
+    """"Two evenings, no Sunday" (2026-11-11)."""
+    sunday = MONDAY + timedelta(days=(gb.EVENING_MOBILITY_FROM_WEEK - 1) * 7 + 6)
+    assert sunday == date(2026, 11, 15)
+    r = env.call(monkeypatch, "get", "/api/training/session", local=sunday)
+    assert r.status_code == 409 and r.json() == {"error": "rest_day"}
+
+
 def test_the_egym_session_runs_through_the_same_flow_on_any_day(env, monkeypatch):
     """The EGYM session (2026-11-08): his gym's fourteen machines, two sets one
     after the other on each ("it can't be a circuit because of the current

@@ -340,6 +340,8 @@ export const S = {
     dailyEffortHelp: 'About half effort: the holds were hard by the end, never maximal.',
     egymLogged: 'EGYM session logged.',
     egymEffortHelp: 'How hard the whole session was, every machine.',
+    mobilityLogged: 'Evening mobility session logged.',
+    mobilityEffortHelp: 'How hard the whole session was, every exercise.',
     // The EGYM session's review (2026-11-08): each machine's tonnage, set by set.
     tonnageTitle: 'Tonnage',
     tonnageSets: (sets: string[]) => sets.map((t, i) => `Set ${i + 1}: ${t}`).join(' · '),
@@ -351,6 +353,10 @@ export const S = {
     trainingDay: 'Training day',
     trainingDayOpen: 'Today’s session and the week',
     dailyTitle: 'Daily tendon session',
+    // The evening mobility session (2026-11-11): on the evening of a strength day with no
+    // strength the next day, the second tile is this session in place of the tendon session.
+    mobilityTitle: 'Evening mobility',
+    mobilityCaption: (n: number, minutes: number) => `${n} exercises · about ${minutes} min`,
     minutes: (minutes: number | null) => (minutes == null ? 'About 10 min, at home' : `About ${minutes} min, at home`),
     after: (time: string) => `8 hours after your gym session: from ${time}`,
     before: 'Keep 8 hours before your gym session.',
@@ -361,7 +367,7 @@ export const S = {
     start: 'Start',
     again: 'Do it again',
     cancel: 'Cancel',
-    blocked: 'There is a session in progress. Finish it or leave it first: the daily session shares the same saved progress, so starting one now would lose where you are.',
+    blocked: 'There is a session in progress. Finish it or leave it first: this session shares the same saved progress, so starting one now would lose where you are.',
     needsEngine: 'The daily session comes from the engine. There is no connection now, and this phone has not saved it yet.',
   },
   // The week page on the Training tab (rebuild Phase 7, T8-T36): the engine's week and
