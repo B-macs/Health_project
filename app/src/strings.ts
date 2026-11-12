@@ -860,8 +860,8 @@ export const S = {
     regionsWhy: 'How often you selected each area in your check-ins over the last 90 days.',
     mentions: (n: number) => `${n} ${n === 1 ? 'check-in' : 'check-ins'}`,
     timeline: 'Tightness over time',
-    timelineWhy: 'Your tightness and pain at each check-in over the last 90 days, on 0 to 10. Keyword-parsed is the tightness read from your note, where the note was read.',
-    series: { self_reported: 'Self-reported', parsed_severity: 'Keyword-parsed', pain: 'Pain' } as Record<string, string>,
+    timelineWhy: 'Your tightness, pain and tiredness at each check-in over the last 90 days, on 0 to 10. Keyword-parsed is the tightness read from your note, where the note was read. Tiredness starts on 12 November 2026.',
+    series: { self_reported: 'Self-reported', parsed_severity: 'Keyword-parsed', pain: 'Pain', tiredness: 'Tiredness' } as Record<string, string>,
     levels: 'Warning level history',
     levelButton: (label: string, n: number) => `${label} (${n})`,
     entry: (tightness: string, pain: string) => `Tightness ${tightness} · Pain ${pain}`,
@@ -1049,6 +1049,7 @@ export const S = {
       electrolytes_taken: { label: 'Salt or electrolytes taken' },
       meditation_minutes: { label: 'Meditation minutes' },
       relaxation_depth: { label: 'Relaxation depth (1-5)' },
+      tiredness_score: { label: 'Tiredness' },
     } as Record<string, { label: string }>,
     tightnessGuide: {
       title: 'Muscle tightness scale',
@@ -1072,6 +1073,19 @@ export const S = {
         ['5-6', 'Moderate', 'Clear pain that makes you change your movement or your form to avoid it.'],
         ['7-8', 'Severe', 'Intense, sharp or throbbing pain. It stops normal movement, or you must stop or change the training.'],
         ['9-10', 'Debilitating', 'Pain that makes any movement impossible. Rest at once, or get medical help.'],
+      ] as const,
+    },
+    // Tiredness (2026-11-12): recorded and shown only; it changes no training.
+    tirednessGuide: {
+      title: 'Tiredness scale',
+      intro: 'Rate how tired you feel this morning, body and mind together. Training, sleep, work and alcohol all add to it.',
+      rows: [
+        ['0', 'Not tired', 'Fully rested and alert.'],
+        ['1-2', 'Slightly tired', 'A little tired. It goes when you start to move.'],
+        ['3-4', 'Mildly tired', 'Tired, but your day and your training feel normal.'],
+        ['5-6', 'Tired', 'Clearly tired. Tasks and training feel harder than normal.'],
+        ['7-8', 'Very tired', 'Heavy and slow. You must push yourself to start a task.'],
+        ['9-10', 'Exhausted', 'You can hardly function. You want only to rest.'],
       ] as const,
     },
   },

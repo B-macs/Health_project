@@ -110,7 +110,13 @@ _CHECKIN_FIELD_MAP: dict[str, tuple[str, str, object]] = {
     "electrolytes_taken":    ("Electrolytes Taken", "checkbox", False),
     "meditation_minutes":    ("Meditation Minutes", "number", 0.0),
     "relaxation_depth":      ("Relaxation Depth", "number", 1),
+    "tiredness_score":       ("Tiredness", "number", 0),
 }
+
+#: Fields a None on the incoming record never overwrites, in either merge: a
+#: form that did not ask the question (the Streamlit check-in has no tiredness
+#: control, 2026-11-12) must not blank a value the phone stored the same day.
+_CHECKIN_KEPT_WHEN_ABSENT = frozenset({"tiredness_score"})
 
 
 _GARMIN_DAILY_HEADER = [
@@ -1707,6 +1713,7 @@ class Repository:
             "Meditation Done":      notion.checkbox(record.meditation_done),
             "Meditation Minutes":   notion.number(record.meditation_minutes),
             "Relaxation Depth":     notion.number(record.relaxation_depth),
+            "Tiredness":            notion.number(record.tiredness_score),
         }
 
     def _find_check_in_page(self, iso_date: str) -> dict | None:
@@ -1745,6 +1752,9 @@ class Repository:
         note_changed = False
         for field, (prop_name, kind, default) in _CHECKIN_FIELD_MAP.items():
             new_val = getattr(new, field)
+            if field in _CHECKIN_KEPT_WHEN_ABSENT and new_val is None:
+                changes[field] = notion.get_property(existing_page, prop_name, kind)
+                continue
             if replace or new_val != default:
                 changes[field] = new_val
                 if field == "subjective_tightness":
@@ -2031,6 +2041,7 @@ class Repository:
                 "meditation_done":       1 if g("Meditation Done", "checkbox") else 0,
                 "meditation_minutes":    g("Meditation Minutes", "number"),
                 "relaxation_depth":      g("Relaxation Depth", "number"),
+                "tiredness_score":       g("Tiredness", "number"),
             })
         return out
 
@@ -2064,6 +2075,7 @@ class Repository:
                 "meditation_done":       1 if g("Meditation Done", "checkbox") else 0,
                 "meditation_minutes":    g("Meditation Minutes", "number"),
                 "relaxation_depth":      g("Relaxation Depth", "number"),
+                "tiredness_score":       g("Tiredness", "number"),
                 "parsed":                1 if g("Parsed", "checkbox") else 0,
                 "parsed_severity":       g("Parsed Severity", "number"),
                 "parsed_areas":          g("Parsed Areas", "rich_text"),

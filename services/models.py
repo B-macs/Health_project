@@ -106,6 +106,10 @@ class CheckInRecord:
     meditation_done: bool = False
     meditation_minutes: float | None = None
     relaxation_depth: int | None = None
+    # Tiredness, 0-10 (2026-11-12): recorded and shown only. None means the form
+    # that built the record did not ask it (a check-in before 2026-11-12, or the
+    # Streamlit form), never "not tired".
+    tiredness_score: float | None = None
 
 
 @dataclass(frozen=True)

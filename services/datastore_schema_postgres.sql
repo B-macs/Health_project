@@ -104,6 +104,7 @@ CREATE TABLE readiness_checkins (
     meditation_done       BIGINT,            -- 0/1
     meditation_minutes    DOUBLE PRECISION,
     relaxation_depth      DOUBLE PRECISION,
+    tiredness_score       DOUBLE PRECISION,   -- 0-10, from 2026-11-12; NULL = not asked
     -- AI note-parsing pipeline output (services.repository.update_readiness_ai) --
     -- absent/0 on every page until that pipeline actually runs against it.
     parsed                BIGINT,            -- 0/1

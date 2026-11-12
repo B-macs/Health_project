@@ -746,6 +746,11 @@
             "title": "Tightness Score",
             "type": "integer"
           },
+          "tiredness_score": {
+            "default": 0,
+            "title": "Tiredness Score",
+            "type": "integer"
+          },
           "travel_flag": {
             "title": "Travel Flag",
             "type": "boolean"

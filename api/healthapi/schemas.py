@@ -515,6 +515,8 @@ class CheckInValues(BaseModel):
     electrolytes_taken: bool
     meditation_minutes: float
     relaxation_depth: int
+    #: 0-10, from 2026-11-12. A save may leave it out (stored as not asked).
+    tiredness_score: int = 0
 
 
 class WholeRange(BaseModel):

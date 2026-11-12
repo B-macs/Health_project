@@ -96,6 +96,7 @@ CREATE TABLE readiness_checkins (
     meditation_done       INTEGER,            -- 0/1
     meditation_minutes    REAL,
     relaxation_depth      REAL,
+    tiredness_score       REAL,               -- 0-10, from 2026-11-12; NULL = not asked
     -- AI note-parsing pipeline output (services.repository.update_readiness_ai) --
     -- absent/0 on every page until that pipeline actually runs against it.
     parsed                INTEGER,            -- 0/1

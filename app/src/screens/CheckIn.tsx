@@ -234,8 +234,14 @@ export function CheckInForm({ form, stage = 'form', refused = null, onSaving, on
         <Scale field="tightness_score" min={whole.tightness_score.min} max={whole.tightness_score.max} value={values.tightness_score} onChange={set('tightness_score')} />
         <Scale field="pain_score" min={whole.pain_score.min} max={whole.pain_score.max} value={values.pain_score} onChange={set('pain_score')} />
         <Choice field="current_condition" options={form.conditions} value={values.current_condition} onChange={set('current_condition') as (v: never) => void} />
+        {/* Tiredness (2026-11-12). A form saved by an older engine has no range for it: then it is not asked. */}
+        {whole.tiredness_score && (
+          <Scale field="tiredness_score" min={whole.tiredness_score.min} max={whole.tiredness_score.max}
+            value={values.tiredness_score ?? whole.tiredness_score.min} onChange={set('tiredness_score')} />
+        )}
         <Guide title={S.checkin.tightnessGuide.title} intro={S.checkin.tightnessGuide.intro} rows={S.checkin.tightnessGuide.rows} />
         <Guide title={S.checkin.painGuide.title} intro={S.checkin.painGuide.intro} rows={S.checkin.painGuide.rows} />
+        {whole.tiredness_score && <Guide title={S.checkin.tirednessGuide.title} intro={S.checkin.tirednessGuide.intro} rows={S.checkin.tirednessGuide.rows} />}
 
         <h3 className="eyebrow">{S.checkin.where}</h3>
         <Chips field="anatomical_locations" options={form.locations} value={values.anatomical_locations} onChange={set('anatomical_locations')} />
@@ -296,6 +302,7 @@ function CheckInDone({ values, waiting, onAgain, onFinish }: {
       <div className="kv"><span>{S.checkin.fields.tightness_score.label}</span><span className="num">{values.tightness_score}</span></div>
       <div className="kv"><span>{S.checkin.fields.pain_score.label}</span><span className="num">{values.pain_score}</span></div>
       <div className="kv"><span>{S.checkin.fields.current_condition.label}</span><span>{values.current_condition}</span></div>
+      {values.tiredness_score != null && <div className="kv"><span>{S.checkin.fields.tiredness_score.label}</span><span className="num">{values.tiredness_score}</span></div>}
       <button type="button" className="btn btn--primary btn--wide" onClick={onFinish}>{S.checkin.finish}</button>
       <button type="button" className="btn btn--glass btn--wide" data-testid="checkin-again" onClick={onAgain}>{S.checkin.again}</button>
       <p className="caption">{S.checkin.againNote}</p>

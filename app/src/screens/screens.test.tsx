@@ -207,6 +207,23 @@ describe('the check-in form', () => {
     expect(html).not.toContain(S.checkin.existing)
   })
 
+  // Tiredness (the owner, 2026-11-12): a 0-10 slider with its guide, under General readiness.
+  it('asks tiredness on a 0-10 slider, with its guide', () => {
+    const stored = { ...fx.checkinForm(LOCAL, LOCAL, undefined).values, tiredness_score: 6 }
+    const raw = draw(<CheckInForm form={fx.checkinForm(LOCAL, LOCAL, stored)} onSaved={() => undefined} />)
+    expect(raw).toContain('<input type="range" class="slider" min="0" max="10" step="1" aria-label="Tiredness" value="6"/>')
+    expect(text(raw)).toContain(S.checkin.tirednessGuide.title)
+    expect(text(raw).indexOf(S.checkin.fields.current_condition.label)).toBeLessThan(text(raw).indexOf(S.checkin.fields.tiredness_score.label))
+  })
+
+  it('a form saved by an older engine, with no tiredness range, still opens and does not ask it', () => {
+    const form = fx.checkinForm(LOCAL, LOCAL, undefined)
+    const older = { ...form, whole: form.whole.filter((r) => r.field !== 'tiredness_score') }
+    const html = text(draw(<CheckInForm form={older} onSaved={() => undefined} />))
+    expect(html).toContain(S.checkin.save)
+    expect(html).not.toContain(S.checkin.tirednessGuide.title)
+  })
+
   it('a day with a stored entry opens with it and says the save replaces it', () => {
     const stored = { ...fx.checkinForm(LOCAL, LOCAL, undefined).values, pain_score: 4 }
     const html = text(draw(<CheckInForm form={fx.checkinForm(LOCAL, LOCAL, stored)} onSaved={() => undefined} />))

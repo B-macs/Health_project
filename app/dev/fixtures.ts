@@ -235,7 +235,7 @@ const DEFAULTS: Schemas['CheckInValues'] = {
   current_condition: 'Excellent', tightness_score: 0, pain_score: 0, anatomical_locations: [], sensation_tags: [],
   subjective_tightness: '', alcohol_units: 0, travel_flag: false, psych_stress_score: 1, instability_events: 0,
   bristol_type: 4, unusual_stool_colour: false, hunger_deviation: 0, thirst_intensity: 1, electrolytes_taken: false,
-  meditation_minutes: 0, relaxation_depth: 3,
+  meditation_minutes: 0, relaxation_depth: 3, tiredness_score: 0,
 }
 
 export function checkinForm(day: string, local: string, stored: Schemas['CheckInValues'] | undefined): Schemas['CheckInFormOut'] {
@@ -247,6 +247,7 @@ export function checkinForm(day: string, local: string, stored: Schemas['CheckIn
       { field: 'tightness_score', min: 0, max: 10 }, { field: 'pain_score', min: 0, max: 10 }, { field: 'psych_stress_score', min: 1, max: 5 },
       { field: 'instability_events', min: 0, max: 20 }, { field: 'bristol_type', min: 0, max: 7 }, { field: 'hunger_deviation', min: -2, max: 2 },
       { field: 'thirst_intensity', min: 1, max: 5 }, { field: 'relaxation_depth', min: 1, max: 5 },
+      { field: 'tiredness_score', min: 0, max: 10 },
     ],
     decimal: [{ field: 'alcohol_units', min: 0, max: 20, step: 0.5 }, { field: 'meditation_minutes', min: 0, max: 120, step: 5 }],
     switches: ['travel_flag', 'unusual_stool_colour', 'electrolytes_taken'],

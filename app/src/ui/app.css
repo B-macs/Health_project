@@ -2156,7 +2156,8 @@ button.card {
   line-height: 1.15;
 }
 
-/* Several series on one chart: the first solid, the second dashed, the third faint. */
+/* Several series on one chart: the first solid, the second dashed, the third faint,
+   the fourth dotted. */
 .ichart__series--1 .ichart__line {
   stroke: var(--f2);
   stroke-dasharray: var(--sp-xs) var(--sp-xs);
@@ -2172,6 +2173,15 @@ button.card {
 
 .ichart__series--2 .ichart__dot {
   fill: var(--faint);
+}
+
+.ichart__series--3 .ichart__line {
+  stroke: var(--f3);
+  stroke-dasharray: var(--hair) var(--sp-xs);
+}
+
+.ichart__series--3 .ichart__dot {
+  fill: var(--f3);
 }
 
 /* A chart's key: one swatch per series, in the series' style. */
@@ -2200,6 +2210,11 @@ button.card {
 
 .legend__item--2::before {
   border-top-color: var(--faint);
+}
+
+.legend__item--3::before {
+  border-top-color: var(--f3);
+  border-top-style: dotted;
 }
 
 /* A plain table of the engine's rows (the data tables), scrolled sideways in its card. */

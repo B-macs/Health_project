@@ -40,13 +40,19 @@ FORM_DEFAULTS: dict[str, object] = {
     "electrolytes_taken": False,
     "meditation_minutes": 0.0,
     "relaxation_depth": 1,
+    "tiredness_score": 0,
 }
+
+#: Fields a save may leave out (stored as None, "not asked"): tiredness joined
+#: the form on 2026-11-12, and a check-in a phone queued before its update
+#: carries no tiredness. It is still refused when given out of range.
+OPTIONAL_FIELDS: frozenset[str] = frozenset({"tiredness_score"})
 
 #: Whole-number controls and the range each can show.
 _WHOLE: dict[str, tuple[int, int]] = {
     "tightness_score": (0, 10), "pain_score": (0, 10), "psych_stress_score": (1, 5),
     "instability_events": (0, 20), "bristol_type": (0, 7), "hunger_deviation": (-2, 2),
-    "thirst_intensity": (1, 5), "relaxation_depth": (1, 5),
+    "thirst_intensity": (1, 5), "relaxation_depth": (1, 5), "tiredness_score": (0, 10),
 }
 #: Decimal controls and their range.
 _DECIMAL: dict[str, tuple[float, float]] = {
@@ -146,7 +152,8 @@ def problems(day: date, today: date, values: dict, locations=(), tags=()) -> lis
                       f"{BACKFILL_DAYS} days before")
     for field in FORM_DEFAULTS:
         if field not in values or values[field] is None:
-            errors.append(f"{field} is not set")
+            if field not in OPTIONAL_FIELDS:
+                errors.append(f"{field} is not set")
             continue
         value = values[field]
         if field in _WHOLE:
@@ -185,7 +192,7 @@ def record_from_form(day: date, today: date, values: dict, locations=(), tags=()
     if errors:
         raise CheckInError(errors)
     return CheckInRecord(date=day.isoformat(),
-                         **{field: values[field] for field in FORM_DEFAULTS},
+                         **{field: values.get(field) for field in FORM_DEFAULTS},
                          meditation_done=meditation_done(values["meditation_minutes"]))
 
 

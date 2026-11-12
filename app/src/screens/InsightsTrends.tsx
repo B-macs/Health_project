@@ -20,7 +20,7 @@ type Trends = components['schemas']['TrendsOut']
 export const TRENDS = '/api/insights/trends'
 
 type Region = { region: string; mentions: number; share: number }
-type Point = { date: string; self_reported: number | null; parsed_severity: number | null; pain: number | null }
+type Point = { date: string; self_reported: number | null; parsed_severity: number | null; pain: number | null; tiredness?: number | null }
 type Axis = { lo: number; hi: number; y_labels: string[]; x_labels: string[]; start: string; end: string }
 type Entry = { date: string; tightness: number | null; pain: number | null; severity: number | null; parts: string; sensation: string }
 type Gate = { bio_days: number; sessions: number; needed: number; enough: boolean }
@@ -35,7 +35,8 @@ type Analysis = {
   }
 }
 
-const SERIES = ['self_reported', 'parsed_severity', 'pain'] as const
+// Tiredness joined the check-in on 2026-11-12: a point from before reads no value.
+const SERIES = ['self_reported', 'parsed_severity', 'pain', 'tiredness'] as const
 const LEVELS = ['none', 'monitor', 'flag'] as const
 
 const shown = (v: number | null | undefined) => (v == null ? S.ins.none : plain(v))
@@ -45,7 +46,7 @@ function Timeline({ points, axis }: { points: Point[]; axis: Axis }) {
     <section className="card group" data-testid="timeline">
       <h2 className="eyebrow">{S.trend.timeline}</h2>
       <DatedLines start={axis.start} end={axis.end} axis={axis} label={S.trend.timeline}
-        series={SERIES.map((key) => ({ name: S.trend.series[key], points: points.map((p) => ({ date: p.date, value: p[key] })) }))} />
+        series={SERIES.map((key) => ({ name: S.trend.series[key], points: points.map((p) => ({ date: p.date, value: p[key] ?? null })) }))} />
       <div className="legend">
         {SERIES.map((key, k) => <span key={key} className={`legend__item legend__item--${k}`}>{S.trend.series[key]}</span>)}
       </div>

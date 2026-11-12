@@ -167,12 +167,15 @@ def tightness_timeline(checkin_rows: list[dict], parsed_rows: list[dict]) -> lis
 
     The owner, 2026-10-20 (his choice between three options): the timeline had drawn only
     the check-ins whose note was parsed, and those ended in early August, so every later
-    check-in was missing from it. A row without a date is skipped."""
+    check-in was missing from it. A row without a date is skipped.
+
+    `tiredness` (2026-11-12) is the check-in's tiredness, None before it was asked."""
     severity = {str(r["date"]): r.get("ai_tightness_severity")
                 for r in parsed_rows if r.get("date")}
     dated = sorted((r for r in checkin_rows if r.get("date")), key=lambda r: str(r["date"]))
     return [{"date": str(r["date"]), "self_reported": r.get("tightness_score"),
-             "parsed_severity": severity.get(str(r["date"])), "pain": r.get("pain_score")}
+             "parsed_severity": severity.get(str(r["date"])), "pain": r.get("pain_score"),
+             "tiredness": r.get("tiredness_score")}
             for r in dated]
 
 

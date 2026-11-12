@@ -179,3 +179,29 @@ def test_the_values_model_names_every_form_field():
     assert set(asdict(CheckInRecord(date="x", current_condition=None, tightness_score=None,
                                     pain_score=None))) - {"date", "meditation_done"} \
         == set(cf.FORM_DEFAULTS)
+
+
+# ── tiredness (the owner, 2026-11-12: a 0-10 slider, recorded and shown only) ──
+
+def test_tiredness_is_a_whole_number_from_0_to_10_and_is_stored(monkeypatch):
+    form = _get(monkeypatch, CheckInStore()).json()
+    assert {"field": "tiredness_score", "min": 0, "max": 10} in form["whole"]
+    assert form["values"]["tiredness_score"] == 0
+    store = CheckInStore()
+    r = _put(monkeypatch, store, TODAY, _values(tiredness_score=7))
+    assert r.status_code == 200 and r.json()["values"]["tiredness_score"] == 7
+    assert store.rows[TODAY.isoformat()].tiredness_score == 7
+    bad = _put(monkeypatch, CheckInStore(), TODAY, _values(tiredness_score=11))
+    assert bad.status_code == 422
+    assert "tiredness_score must be a whole number from 0 to 10" in bad.json()["error"]
+
+
+def test_a_check_in_from_a_phone_without_tiredness_is_stored_as_not_asked(monkeypatch):
+    """A check-in the phone queued before its update carries no tiredness: it is
+    stored, and tiredness reads as not asked, never as 0."""
+    store = CheckInStore()
+    values = _values(tightness_score=2)
+    del values["tiredness_score"]
+    r = _put(monkeypatch, store, TODAY, values)
+    assert r.status_code == 200
+    assert store.rows[TODAY.isoformat()].tiredness_score is None

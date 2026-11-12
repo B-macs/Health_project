@@ -1236,6 +1236,11 @@ export interface components {
             thirst_intensity: number;
             /** Tightness Score */
             tightness_score: number;
+            /**
+             * Tiredness Score
+             * @default 0
+             */
+            tiredness_score: number;
             /** Travel Flag */
             travel_flag: boolean;
             /** Unusual Stool Colour */

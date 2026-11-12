@@ -92,6 +92,7 @@ PROPERTIES: dict[str, dict[str, tuple[str | None, str]]] = {
         "Alcohol Units":        ("alcohol_units", "number"),
         "Travel":               ("travel_flag", "checkbox"),
         "Stress Level":         ("psych_stress_score", "number"),
+        "Tiredness":            ("tiredness_score", "number"),
         "Instability Events":   ("instability_events", "number"),
         "Bristol Type":         ("bristol_type", "number"),
         "Unusual Stool Colour": ("unusual_stool_colour", "checkbox"),

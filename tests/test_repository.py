@@ -800,6 +800,26 @@ def test_save_check_in_upsert_explicit_new_value_overwrites_old_value():
     assert props["Tightness"] == {"number": 6.0}
 
 
+def test_save_check_in_a_form_without_tiredness_never_blanks_the_stored_one():
+    """Tiredness (2026-11-12): the Streamlit check-in has no tiredness control, so
+    its record carries None. In either merge it keeps the value the phone stored,
+    and a real value still replaces it."""
+    for replace in (False, True):
+        repo = _repo({"db-readiness": [_existing_check_in_page(Tiredness=_number_prop(6))]})
+        record = models.CheckInRecord(
+            date="2026-07-31", current_condition="Good", tightness_score=3, pain_score=1,
+        )
+        assert record.tiredness_score is None
+        repo.save_check_in(record, replace=replace)
+        props = repo._notion_client.pages.updated[0]["properties"]
+        assert props["Tiredness"] == {"number": 6.0}, replace
+    repo = _repo({"db-readiness": [_existing_check_in_page(Tiredness=_number_prop(6))]})
+    repo.save_check_in(models.CheckInRecord(
+        date="2026-07-31", current_condition="Good", tightness_score=3, pain_score=1,
+        tiredness_score=2), replace=True)
+    assert repo._notion_client.pages.updated[0]["properties"]["Tiredness"] == {"number": 2.0}
+
+
 def test_save_check_in_upsert_resets_parsed_when_note_text_changes():
     repo = _repo({"db-readiness": [_existing_check_in_page()]})
     record = models.CheckInRecord(

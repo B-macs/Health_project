@@ -147,14 +147,16 @@ def test_a_malformed_selection_is_skipped_never_guessed():
 
 def test_every_check_in_is_on_the_timeline_with_a_severity_only_where_its_note_was_read():
     from services import insights
-    checkins = [{"date": "2026-10-19", "tightness_score": 3, "pain_score": 0},
+    checkins = [{"date": "2026-11-12", "tightness_score": 3, "pain_score": 0, "tiredness_score": 6},
                 {"date": "2026-08-02", "tightness_score": 5, "pain_score": 1},
                 {"date": None, "tightness_score": 9, "pain_score": 9}]
     parsed = [{"date": "2026-08-02", "ai_tightness_severity": 4},
               {"date": "2026-06-30", "ai_tightness_severity": 7}]   # outside the window
     assert insights.tightness_timeline(checkins, parsed) == [
-        {"date": "2026-08-02", "self_reported": 5, "parsed_severity": 4, "pain": 1},
-        {"date": "2026-10-19", "self_reported": 3, "parsed_severity": None, "pain": 0},
+        {"date": "2026-08-02", "self_reported": 5, "parsed_severity": 4, "pain": 1,
+         "tiredness": None},                           # before tiredness was asked
+        {"date": "2026-11-12", "self_reported": 3, "parsed_severity": None, "pain": 0,
+         "tiredness": 6},
     ]
 
 
