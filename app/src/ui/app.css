@@ -281,6 +281,13 @@ ul {
   gap: var(--sp-s);
 }
 
+/* A past day's sessions, one card each, in the order done (2026-11-12). */
+.logged-cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+}
+
 /* A button's words wrap inside it, never past the screen's edge (2026-10-21: a yoga
  * flow's name ran off both sides of the page). */
 .btn {

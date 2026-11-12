@@ -2788,6 +2788,44 @@ class Repository:
                     row["last_set_ts"] = ts
         return list(out.values())
 
+    def get_day_logged_sessions(self, d: date) -> list[dict]:
+        """Every session logged on `d`, apart: {"session_id", "rpe",
+        "minutes", "au", "exercises"}, each exercise {"name", "movement_type",
+        "planned_sets", "first_set_ts"} in the order the rows were read
+        (first_set_ts: the earliest per-set "ts", None when no set carries
+        one). For the past day's view (the owner, 2026-11-12: *"when I review
+        previous training days they should be in order or performed"*):
+        get_recent_sessions puts every session of a date in one list, with the
+        session figures of whichever row came first.
+        services.training_screen.order_logged_sessions puts them in order."""
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Session Date", "date": {"equals": str(d)}},
+        )
+        out: dict[str, dict] = {}
+        for p in pages:
+            g = lambda name, kind: notion.get_property(p, name, kind)
+            sid = g("Session ID", "rich_text") or ""
+            row = out.setdefault(sid, {"session_id": sid,
+                                       "rpe": g("Session RPE", "number"),
+                                       "minutes": g("Session Duration", "number"),
+                                       "au": g("Session AU", "number"),
+                                       "exercises": []})
+            try:
+                sets = json.loads(g("Sets", "rich_text") or "[]")
+            except Exception:
+                sets = []
+            first = None
+            for s in sets if isinstance(sets, list) else []:
+                ts = s.get("ts") if isinstance(s, dict) else None
+                if ts and (first is None or _ts_after(first, ts)):
+                    first = ts
+            row["exercises"].append({"name": g("Movement", "title"),
+                                     "movement_type": g("Type", "select"),
+                                     "planned_sets": g("Planned Sets", "number"),
+                                     "first_set_ts": first})
+        return list(out.values())
+
     def get_supplementary_sessions_live(self, day: date, session_type: str) -> dict[str, dict]:
         """One day's sessions of one supplementary Type, read from Notion
         ITSELF: {session_id: {"movements": [...], "notes": [...]}}.

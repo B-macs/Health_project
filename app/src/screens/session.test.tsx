@@ -441,7 +441,7 @@ describe('the exercise the flow is on (WP-31)', () => {
 describe('a trained day stays trained (WP-32)', () => {
   const today = fx.trainingDay('2026-10-20', '2026-10-20')
   const logged = { ...today, overview: { ...today.overview!, screen: 'logged' },
-    logged: { rpe: 6, minutes: 50, au: 300, exercises: [{ name: 'Made-up squat', movement_type: 'Strength', planned_sets: 3 }] } }
+    logged: { rpe: 6, minutes: 50, au: 300, exercises: [{ name: 'Made-up squat', movement_type: 'Strength', planned_sets: 3 }], sessions: [] } }
 
   it('the engine\'s logged answer or a save on this phone today: never Start again', () => {
     expect(trainedToday(today, null, '2026-10-20')).toBe(false)

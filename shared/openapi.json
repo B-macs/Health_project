@@ -3010,6 +3010,64 @@
         "title": "LiftRow",
         "type": "object"
       },
+      "LoggedBlock": {
+        "description": "One session of the day, apart (2026-11-12): its kind (plan, daily,\nmobility, accessory, egym, yoga, outdoor), its own effort, minutes and\nload, and its exercises in the order done.",
+        "properties": {
+          "au": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Au"
+          },
+          "exercises": {
+            "items": {
+              "$ref": "#/components/schemas/LoggedExercise"
+            },
+            "title": "Exercises",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
+          },
+          "rpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpe"
+          }
+        },
+        "required": [
+          "kind",
+          "rpe",
+          "minutes",
+          "au",
+          "exercises"
+        ],
+        "title": "LoggedBlock",
+        "type": "object"
+      },
       "LoggedExercise": {
         "properties": {
           "movement_type": {
@@ -3061,6 +3119,7 @@
         "type": "object"
       },
       "LoggedSession": {
+        "description": "The day's logged sessions. `sessions` holds each one apart, in the\norder done; the top-level figures are the plan session's and\n`exercises` is every session's list in order, for an older phone.",
         "properties": {
           "au": {
             "anyOf": [
@@ -3101,6 +3160,14 @@
               }
             ],
             "title": "Rpe"
+          },
+          "sessions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LoggedBlock"
+            },
+            "title": "Sessions",
+            "type": "array"
           }
         },
         "required": [

@@ -463,6 +463,16 @@ export const S = {
     loggedLine: (rpe: number | null, minutes: number | null, au: number | null) =>
       `Effort ${rpe ?? '—'} of 10 · ${minutes ?? '—'} min · load ${au == null ? '—' : Math.round(au)}`,
     loggedExercise: (type: string | null, sets: number | null) => `${type || 'Exercise'} · ${sets ?? '—'} sets`,
+    // Each session of a past day apart, in the order done (2026-11-12), named by its kind.
+    loggedKind: {
+      plan: 'Training session',
+      daily: 'Daily tendon session',
+      mobility: 'Evening mobility',
+      accessory: 'Accessory session',
+      egym: 'EGYM session',
+      yoga: 'Yoga',
+      outdoor: 'Hike / Walk',
+    } as Record<string, string>,
     loggedNoDetail: 'Session marked complete, but no exercise detail could be loaded.',
     notCompleted: 'Not completed',
     missedDay: (n: number, days: number, objective: string) => `Day ${n} of ${days}: ${objective} (planned, not done)`,

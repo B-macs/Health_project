@@ -193,6 +193,33 @@ def test_a_logged_day_locks_the_session_and_shows_what_was_logged(env, monkeypat
     assert past["logged"]["au"] == 300 and past["logged"]["exercises"][0]["name"] == "Hack Squat"
 
 
+def test_a_past_day_shows_each_session_apart_in_the_order_done(env, monkeypatch):
+    """The owner, 2026-11-12: the A session and the daily tendon session read as one
+    list in no order, under the daily session's figures."""
+    day = MONDAY.isoformat()
+    def ex(eid, name, minute):
+        return {"exercise_id": eid, "exercise": {"name": name, "type": "reps", "sets": 1,
+                                                 "reps": 10, "equipment_type": "machine"},
+                "sets": [{"set_num": 1, "reps": 10, "weight": 40,
+                          "ts": f"{day}T{minute}:00+01:00"}]}
+    # Saved in the plan's order; done the other way round ("In use? Do another first").
+    env.ok(monkeypatch, "post", "/api/training/sessions", local=MONDAY, body={
+        "session_id": f"{day}-0000abcd", "date": day, "kind": "plan",
+        "duration_minutes": 50, "session_rpe": 6,
+        "exercises": [ex("ex-a", "Hack Squat", "08:40"), ex("ex-b", "Leg Press", "08:10")]})
+    env.ok(monkeypatch, "post", "/api/training/sessions", local=MONDAY, body={
+        "session_id": f"{day}-0000dddd", "date": day, "kind": "daily",
+        "duration_minutes": 10, "session_rpe": 3,
+        "exercises": [ex("ex-c", "Active Hang", "16:00")]})
+    past = env.ok(monkeypatch, "get", f"/api/training/day?date={MONDAY}", local=TUESDAY)
+    blocks = past["logged"]["sessions"]
+    assert [b["kind"] for b in blocks] == ["plan", "daily"]
+    assert [e["name"] for e in blocks[0]["exercises"]] == ["Leg Press", "Hack Squat"]
+    assert (blocks[0]["minutes"], blocks[0]["au"]) == (50, 300)
+    assert (blocks[1]["minutes"], blocks[1]["au"]) == (10, 30)
+    assert past["logged"]["au"] == 300, "the top line is the plan session's"
+
+
 # ── the schedule answers ─────────────────────────────────────────────────────
 
 def test_a_swap_moves_tuesdays_session_onto_today(env, monkeypatch):

@@ -2047,6 +2047,24 @@ export interface components {
             /** Weight Kg */
             weight_kg: number;
         };
+        /**
+         * LoggedBlock
+         * @description One session of the day, apart (2026-11-12): its kind (plan, daily,
+         *     mobility, accessory, egym, yoga, outdoor), its own effort, minutes and
+         *     load, and its exercises in the order done.
+         */
+        LoggedBlock: {
+            /** Au */
+            au: number | null;
+            /** Exercises */
+            exercises: components["schemas"]["LoggedExercise"][];
+            /** Kind */
+            kind: string;
+            /** Minutes */
+            minutes: number | null;
+            /** Rpe */
+            rpe: number | null;
+        };
         /** LoggedExercise */
         LoggedExercise: {
             /** Movement Type */
@@ -2061,7 +2079,12 @@ export interface components {
             /** Logged */
             logged: boolean;
         };
-        /** LoggedSession */
+        /**
+         * LoggedSession
+         * @description The day's logged sessions. `sessions` holds each one apart, in the
+         *     order done; the top-level figures are the plan session's and
+         *     `exercises` is every session's list in order, for an older phone.
+         */
         LoggedSession: {
             /** Au */
             au: number | null;
@@ -2071,6 +2094,11 @@ export interface components {
             minutes: number | null;
             /** Rpe */
             rpe: number | null;
+            /**
+             * Sessions
+             * @default []
+             */
+            sessions: components["schemas"]["LoggedBlock"][];
         };
         /** ManualSyncOut */
         ManualSyncOut: {

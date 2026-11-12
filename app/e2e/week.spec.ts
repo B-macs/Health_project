@@ -80,7 +80,9 @@ test('the week page shows the banner, the strip and every kind of day, and write
   await expect(page.getByTestId('week-today')).toBeVisible()
   await expect(page.getByTestId('week-status')).toContainText(S.week.verdict.normal)
   await strip(page).locator('[data-marker="done"]').first().click()
-  await expect(page.getByTestId('day-logged')).toContainText(S.week.logged)
+  // Each session of the day apart, in the order done (2026-11-12).
+  await expect(page.getByTestId('day-logged')).toContainText(S.week.loggedKind.plan)
+  await expect(page.getByTestId('day-logged')).toContainText(S.week.loggedKind.daily)
   await strip(page).locator('[data-marker="missed"]').first().click()
   await expect(page.getByTestId('not-completed')).toBeVisible()
   await expect(page.getByRole('button', { name: S.week.swapMissed })).toBeVisible()

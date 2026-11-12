@@ -26,9 +26,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
+from services import accessory as acc
+from services import daily_session as dly
 from services import decision as _decision
+from services import egym_session as egs
+from services import mobility_session as mob
+from services import supplementary_save as supp
 from services import flexibility as fx
 from services import gate1 as g1
 from services import plan as _plan
@@ -340,16 +345,70 @@ def _planned(r: Reads, day: date) -> dict:
             "home": [exercise_line(ex) for ex in (content or {}).get("home") or []]}
 
 
+#: A session's kind, from the Type its rows are stored under: a plan
+#: exercise keeps its own movement type, so a session that is not all one of
+#: these is the plan session ("plan").
+LOGGED_KIND_BY_TYPE = {
+    dly.DAILY_TYPE: "daily", mob.MOBILITY_TYPE: "mobility", acc.ACCESSORY_TYPE: "accessory",
+    egs.EGYM_TYPE: "egym", supp.YOGA_TYPE: "yoga", supp.OUTDOOR_TYPE: "outdoor",
+}
+
+
+def _instant(ts) -> datetime | None:
+    """A set's "ts" as an instant. The phone stamps its own UTC offset; the
+    first per-set times (August 2026) were stamped by the hosted server in
+    UTC with no offset, read here as UTC. None when it does not parse."""
+    try:
+        t = datetime.fromisoformat(str(ts))
+    except (TypeError, ValueError):
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+
+
+def order_logged_sessions(raw: list[dict]) -> list[dict]:
+    """One day's sessions (Repository.get_day_logged_sessions) in the order
+    they were done, each with its exercises in the order done (the owner,
+    2026-11-12: *"when I review previous training days they should be in
+    order or performed"*). An exercise's place is its first set's time; an
+    exercise with no timed set (a skipped one, or history before per-set
+    times) keeps its read order after the timed ones. A session's place is
+    its first timed set; sessions with none come last. Each session keeps its
+    own effort, minutes and load, and names its kind."""
+    out = []
+    for s in raw:
+        exercises = [dict(e, _i=i) for i, e in enumerate(s.get("exercises") or [])]
+        timed = sorted((e for e in exercises if _instant(e.get("first_set_ts"))),
+                       key=lambda e: (_instant(e["first_set_ts"]), e["_i"]))
+        untimed = [e for e in exercises if not _instant(e.get("first_set_ts"))]
+        types = {e.get("movement_type") for e in exercises}
+        kind = LOGGED_KIND_BY_TYPE.get(next(iter(types)), "plan") if len(types) == 1 else "plan"
+        out.append({
+            "kind": kind, "rpe": s.get("rpe"), "minutes": s.get("minutes"), "au": s.get("au"),
+            "exercises": [{"name": e.get("name") or "", "movement_type": e.get("movement_type"),
+                           "planned_sets": e.get("planned_sets")} for e in timed + untimed],
+            "_start": _instant(timed[0]["first_set_ts"]) if timed else None,
+            "_id": s.get("session_id") or "",
+        })
+    far = datetime.max.replace(tzinfo=timezone.utc)
+    out.sort(key=lambda s: (s["_start"] or far, s["_id"]))
+    for s in out:
+        del s["_start"], s["_id"]
+    return [s for s in out if s["exercises"]]
+
+
 def _logged_session(repo, day: date, today: date) -> dict | None:
-    sessions = _try(lambda: repo.get_recent_sessions(days=sess.days_back_to(day, today),
-                                                     today=today), [])
-    found = next((s for s in sessions if s.session_date == day.isoformat()), None)
-    if not found or not found.exercises:
+    """The day's logged sessions, apart and in order (order_logged_sessions).
+    The top-level effort, minutes and load are the plan session's (else the
+    first session's), and `exercises` is every session's list in order: the
+    shape a phone that predates `sessions` reads."""
+    raw = _try(lambda: repo.get_day_logged_sessions(day), [])
+    ordered = order_logged_sessions(raw)
+    if not ordered:
         return None      # logged by the strip's check, but no detail could be read
-    return {"rpe": found.session_rpe, "minutes": found.session_duration_minutes,
-            "au": found.session_au,
-            "exercises": [{"name": e.name, "movement_type": e.movement_type,
-                           "planned_sets": e.planned_sets} for e in found.exercises]}
+    main = next((s for s in ordered if s["kind"] == "plan"), ordered[0])
+    return {"rpe": main["rpe"], "minutes": main["minutes"], "au": main["au"],
+            "exercises": [e for s in ordered for e in s["exercises"]],
+            "sessions": ordered}
 
 
 def rest_view(day: date, today: date) -> dict:

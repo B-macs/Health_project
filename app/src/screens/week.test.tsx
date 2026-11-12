@@ -13,7 +13,7 @@ import { AppStateProvider } from '../lib/appState'
 import { S } from '../strings'
 import { longDate } from '../ui/parts'
 import {
-  DayView, Gate1, GapScreen, MovePrompts, RedoOffer, Refusals, Retest, RollupBanner, ScheduleNote, WeekStrip, waiting,
+  DayView, Gate1, GapScreen, LoggedView, MovePrompts, RedoOffer, Refusals, Retest, RollupBanner, ScheduleNote, WeekStrip, waiting,
 } from './Week'
 
 const LOCAL = '2026-10-21' // a Wednesday
@@ -159,11 +159,20 @@ describe('the strip', () => {
 describe('a day', () => {
   const day = (date: string, scenario: string[] = []) => fx.trainingDay(date, LOCAL, new Set(scenario))
 
-  it('a logged day shows its session', () => {
+  it('a logged day shows each session apart, in the order done, with its own figures', () => {
     const html = text(draw(<DayView day={day(MONDAY)} rows={[]} onSwap={() => undefined} />))
+    expect(html).toContain(S.week.loggedLine(6, 52, 300))
+    expect(html).toContain(S.week.loggedLine(3, 10, 30))
+    expect(html.indexOf(S.week.loggedKind.plan)).toBeLessThan(html.indexOf(S.week.loggedKind.daily))
+    expect(html.indexOf('Made-up squat')).toBeLessThan(html.indexOf(S.week.loggedKind.daily))
+    expect(html.indexOf(S.week.loggedKind.daily)).toBeLessThan(html.indexOf('Made-up hang'))
+  })
+
+  it('an answer from an older engine, with no sessions, shows as one card', () => {
+    const old = day(MONDAY)
+    const html = text(draw(<LoggedView logged={{ ...old.logged!, sessions: [] }} />))
     expect(html).toContain(S.week.logged)
     expect(html).toContain(S.week.loggedLine(6, 52, 300))
-    expect(html).toContain('Made-up squat')
   })
 
   it('a missed day says so, lists what was planned and offers the swap with today', () => {

@@ -94,7 +94,13 @@ export function trainingDay(day: string, local: string, scenario: ReadonlySet<st
     const marker = markerOf(day, local)
     if (marker === 'rest') return { ...base, route: 'rest', phase, rest: { is_today: false, yoga_suggestion: YOGA_SUGGESTION } }
     if (marker === 'done') {
-      return { ...base, route: 'past_completed', phase, logged: { au: 300, minutes: 52, rpe: 6, exercises: [{ name: 'Made-up squat', movement_type: null, planned_sets: 3 }] } }
+      return { ...base, route: 'past_completed', phase, logged: { au: 300, minutes: 52, rpe: 6,
+        exercises: [{ name: 'Made-up squat', movement_type: null, planned_sets: 3 }, { name: 'Made-up hang', movement_type: 'Daily', planned_sets: 1 }],
+        // Each session apart, in the order done (2026-11-12).
+        sessions: [
+          { kind: 'plan', au: 300, minutes: 52, rpe: 6, exercises: [{ name: 'Made-up squat', movement_type: null, planned_sets: 3 }] },
+          { kind: 'daily', au: 30, minutes: 10, rpe: 3, exercises: [{ name: 'Made-up hang', movement_type: 'Daily', planned_sets: 1 }] },
+        ] } }
     }
     const missed = marker === 'missed'
     return {

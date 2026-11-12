@@ -152,7 +152,7 @@ test('a whole session runs from Start to Save, offline in the middle, and is sto
   await expect(state).toContainText(S.session.savedPhone)
   await hook(page)
   // The heart-rate match waits right behind the session (2026-11-11).
-  expect(await page.evaluate(async () => (await window.__health!.outbox()).map((r) => (r as { kind: string }).kind)))
+  expect(await page.evaluate(async () => (await window.__health!.outbox()).map((r) => (r as unknown as { kind: string }).kind)))
     .toEqual(['session', 'heart-rate'])
   expect(await sends(page, tag)).toEqual([])
   // No connection: Done comes back at once; the phone keeps both.

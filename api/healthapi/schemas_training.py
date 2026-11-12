@@ -191,11 +191,26 @@ class LoggedExercise(BaseModel):
     planned_sets: int | None
 
 
-class LoggedSession(BaseModel):
+class LoggedBlock(BaseModel):
+    """One session of the day, apart (2026-11-12): its kind (plan, daily,
+    mobility, accessory, egym, yoga, outdoor), its own effort, minutes and
+    load, and its exercises in the order done."""
+    kind: str
     rpe: float | None
     minutes: float | None
     au: float | None
     exercises: list[LoggedExercise]
+
+
+class LoggedSession(BaseModel):
+    """The day's logged sessions. `sessions` holds each one apart, in the
+    order done; the top-level figures are the plan session's and
+    `exercises` is every session's list in order, for an older phone."""
+    rpe: float | None
+    minutes: float | None
+    au: float | None
+    exercises: list[LoggedExercise]
+    sessions: list[LoggedBlock] = []
 
 
 class YogaSuggestion(BaseModel):

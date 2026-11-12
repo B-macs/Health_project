@@ -295,15 +295,14 @@ export function RestView({ rest }: { rest: Schemas['RestView'] | null | undefine
   )
 }
 
-/** A past day with a logged session (T20), and today once it is logged (WP-32). */
-export function LoggedView({ logged }: { logged: Schemas['LoggedSession'] | null | undefined }) {
-  if (!logged) return <p className="caption" data-testid="day-logged">{S.week.loggedNoDetail}</p>
+/** One logged session: its own effort, minutes and load, and its exercises in the order done. */
+function LoggedCard({ title, block }: { title: string; block: Pick<Schemas['LoggedBlock'], 'rpe' | 'minutes' | 'au' | 'exercises'> }) {
   return (
-    <section className="card group" data-testid="day-logged">
-      <span className="eyebrow logged"><IconCheck />{S.week.logged}</span>
-      <p className="caption">{S.week.loggedLine(logged.rpe, logged.minutes, logged.au)}</p>
+    <section className="card group">
+      <span className="eyebrow logged"><IconCheck />{title}</span>
+      <p className="caption">{S.week.loggedLine(block.rpe, block.minutes, block.au)}</p>
       <ul className="list">
-        {logged.exercises.map((e, i) => (
+        {block.exercises.map((e, i) => (
           <li key={`${e.name}-${i}`} className="kv">
             <span>{e.name}</span>
             <span className="caption">{S.week.loggedExercise(e.movement_type, e.planned_sets)}</span>
@@ -311,6 +310,20 @@ export function LoggedView({ logged }: { logged: Schemas['LoggedSession'] | null
         ))}
       </ul>
     </section>
+  )
+}
+
+/** A past day with a logged session (T20), and today once it is logged (WP-32). Each session
+ *  of the day is its own card, in the order done (the owner, 2026-11-12). An answer saved by an
+ *  older engine has no `sessions`: it shows as one card, as before. */
+export function LoggedView({ logged }: { logged: Schemas['LoggedSession'] | null | undefined }) {
+  if (!logged) return <p className="caption" data-testid="day-logged">{S.week.loggedNoDetail}</p>
+  const blocks = logged.sessions ?? []
+  if (!blocks.length) return <div data-testid="day-logged"><LoggedCard title={S.week.logged} block={logged} /></div>
+  return (
+    <div className="logged-cards" data-testid="day-logged">
+      {blocks.map((b, i) => <LoggedCard key={`${b.kind}-${i}`} title={S.week.loggedKind[b.kind] ?? S.week.logged} block={b} />)}
+    </div>
   )
 }
 
