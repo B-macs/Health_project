@@ -245,3 +245,17 @@ def test_a_bad_parameter_answers_the_error_shape(monkeypatch):
     assert r.status_code == 422
     body = r.json()
     assert set(body) == {"error"} and body["error"].startswith("invalid_request: query.date")
+
+
+def test_the_strain_card_leads_with_the_strain_carried_into_the_day(monkeypatch):
+    """The owner, 2026-11-12: "I want to see accumulate strain each day not the strain
+    of just that day". A session two days ago (320 AU) and none today: the card shows a
+    quarter of that day's strain, and today's own line reads Rest, 0.0."""
+    from services import dashboard as dash
+    with _client(monkeypatch, FakeRepository()) as c:
+        strain = _get(c, "/api/today").json()["strain"]
+    two_days_ago = [{"date": (TODAY - timedelta(days=2)).isoformat(), "total_au": 320.0}]
+    expected = round(dash.day_strain(two_days_ago[0]["date"], two_days_ago, 2)["strain"] / 4, 1)
+    assert strain["value"] == expected and strain["display"] == f"{expected:.1f}"
+    assert strain["today"] == {"value": 0.0, "display": "0.0", "label": "Rest"}
+    assert strain["seven_day"] is None, "the carried strain does the 7-day average's job"

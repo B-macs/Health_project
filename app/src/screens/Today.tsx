@@ -218,8 +218,9 @@ export function TodayView({ view, week, plan, shownDay, notices = [] }: {
           <span className="num tile__value">{t?.strain.display ?? S.none}</span>
           <span className="word">{t?.strain.label ?? S.none}</span>
           <span className="caption">{t?.strain.header ?? ''}</span>
-          {t?.strain.rest_day && t.strain.seven_day != null && (
-            <span className="caption" data-testid="strain-7d">{S.today.sevenDay(t.strain.seven_day.toFixed(1))}</span>
+          {/* The figure above is the strain carried into the day; this is the day's own (2026-11-12). */}
+          {t?.strain.today && (
+            <span className="caption" data-testid="strain-own">{S.today.strainOwn(t.is_today, t.strain.today.display, t.strain.today.label)}</span>
           )}
         </button>
       </section>

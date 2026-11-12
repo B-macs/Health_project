@@ -64,7 +64,7 @@ export function today(day: string, local: string): Schemas['TodayOut'] {
     strain: {
       value: t, display: t.toFixed(1), label: t < 8 ? 'Light' : t < 12 ? 'Moderate' : 'Hard', header: 'Training load',
       description: '', colour: '', card_label: 'STRAIN', is_rolling: false, unscored_reason: '', scale: 21,
-      rest_day: false, seven_day: null,
+      rest_day: false, seven_day: null, today: { value: t, display: t.toFixed(1), label: t < 8 ? 'Light' : 'Moderate' },
     },
     verdict: day === local
       ? { badge: '', banner_kind: '', banner_text: '', cause: '', has_something_to_say: false, hrv_note: '', reduced: false, tone: '' }
@@ -213,7 +213,10 @@ export function strainDetail(day: string, local: string, showWeek: boolean): Sch
   const t = strainOf(day)
   return {
     ...frame(day, local), title: `STRAIN · ${frame(day, local).date_label}`, screen_title: 'Strain History', is_rolling: false, stage_unread: '',
-    masthead: { colour: '', display: t.toFixed(1), label: t < 8 ? 'Light' : 'Moderate' },
+    masthead: { colour: '', display: (t + 3).toFixed(1), label: t + 3 < 8 ? 'Light' : 'Moderate' },
+    // The carried strain (2026-11-12): made up, the day shown and the day before.
+    today: { value: t, display: t.toFixed(1), label: t < 8 ? 'Light' : 'Moderate' },
+    carry: { per_day: 0.5, days: [{ date: day, strain: t, share: 1, carried: t }, { date: addDays(day, -1), strain: 6, share: 0.5, carried: 3 }] },
     region: {
       state: 'split', reason: null, can_show_window: true, showing_week: showWeek, week: showWeek, ceiling: null, mapped_only: true,
       non_additive_note: null, overall: t, regions_total: t, shares_basis: null, shares_version: 1, stage: 2, thin_sample_pct: null,

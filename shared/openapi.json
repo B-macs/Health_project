@@ -7326,6 +7326,16 @@
             ],
             "title": "Seven Day"
           },
+          "today": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrainDayOwn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unscored_reason": {
             "title": "Unscored Reason",
             "type": "string"
@@ -7357,11 +7367,104 @@
         "title": "StrainCardOut",
         "type": "object"
       },
+      "StrainCarriedDay": {
+        "description": "One day that adds to the carried strain: its own strain, the share of it\nstill carried on the day shown, and that part.",
+        "properties": {
+          "carried": {
+            "title": "Carried",
+            "type": "number"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "share": {
+            "title": "Share",
+            "type": "number"
+          },
+          "strain": {
+            "title": "Strain",
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "strain",
+          "share",
+          "carried"
+        ],
+        "title": "StrainCarriedDay",
+        "type": "object"
+      },
+      "StrainCarry": {
+        "description": "How the carried strain adds up (2026-11-12): the share carried from one\nday to the next, and each day that carried any strain, newest first.",
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/StrainCarriedDay"
+            },
+            "title": "Days",
+            "type": "array"
+          },
+          "per_day": {
+            "title": "Per Day",
+            "type": "number"
+          }
+        },
+        "required": [
+          "per_day",
+          "days"
+        ],
+        "title": "StrainCarry",
+        "type": "object"
+      },
+      "StrainDayOwn": {
+        "description": "The day's own strain (its sessions and walks), and its band (\"Rest\" on a\nday with no session): the card's second line since 2026-11-12.",
+        "properties": {
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "display",
+          "label"
+        ],
+        "title": "StrainDayOwn",
+        "type": "object"
+      },
       "StrainDetailOut": {
         "properties": {
           "bio_failed": {
             "title": "Bio Failed",
             "type": "boolean"
+          },
+          "carry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrainCarry"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "date": {
             "format": "date",
@@ -7437,6 +7540,16 @@
           "title": {
             "title": "Title",
             "type": "string"
+          },
+          "today": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrainDayOwn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "trend": {
             "$ref": "#/components/schemas/TrendChart"

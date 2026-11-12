@@ -31,7 +31,8 @@ export const S = {
     verdict: "Today's decision",
     openReadiness: 'Open readiness',
     openSleep: 'Open sleep',
-    sevenDay: (v: string) => `7-day average ${v}`,
+    // The day's own strain, under the carried strain (2026-11-12).
+    strainOwn: (isToday: boolean, display: string, label: string) => `${isToday ? 'Today' : 'That day'} ${display} · ${label}`,
     openStrain: 'Open strain',
     dayRing: (date: string, value: number | null, label: string) =>
       value == null ? `${date}: no readiness reading` : `${date}: readiness ${value}, ${label}`,
@@ -94,6 +95,15 @@ export const S = {
     hideWeek: 'Hide the week',
     source: 'How this strain was measured',
     blend: (pct: number, hr: number, rpe: number) => `Strain is ${pct}% from your heart rate (${hr.toFixed(1)}) and the rest from your session rating (${rpe.toFixed(1)}).`,
+    // The carried strain (2026-11-12): the figure at the top, and how it adds up.
+    strainOwn: (display: string, label: string) => `This day's own strain: ${display} · ${label}`,
+    carry: 'How the carried strain adds up',
+    carryIntro: (perDay: number) =>
+      `Each day's own strain counts in full on that day, then ${perDay === 0.5 ? 'half' : `${Math.round(perDay * 100)}%`} as much on each day after. These days of the last two weeks carry strain into this day:`,
+    carryShare: (share: number) => (share >= 1 ? 'in full' : share === 0.5 ? '× ½' : `× 1/${Math.round(1 / share)}`),
+    carryRow: (strain: string, share: string, carried: string) => `${strain} ${share} = ${carried}`,
+    carryNone: 'No strain in the last two weeks.',
+    carryTotal: 'Carried strain',
   },
   charts: {
     empty: 'Not enough readings for a chart in this period.',

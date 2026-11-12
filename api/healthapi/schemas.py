@@ -84,14 +84,41 @@ class ReadinessCardOut(Band):
     scale: float
 
 
+class StrainDayOwn(BaseModel):
+    """The day's own strain (its sessions and walks), and its band ("Rest" on a
+    day with no session): the card's second line since 2026-11-12."""
+    value: float | None
+    display: str
+    label: str
+
+
+class StrainCarriedDay(BaseModel):
+    """One day that adds to the carried strain: its own strain, the share of it
+    still carried on the day shown, and that part."""
+    date: date
+    strain: float
+    share: float
+    carried: float
+
+
+class StrainCarry(BaseModel):
+    """How the carried strain adds up (2026-11-12): the share carried from one
+    day to the next, and each day that carried any strain, newest first."""
+    per_day: float
+    days: list[StrainCarriedDay]
+
+
 class StrainCardOut(Band):
+    #: The strain carried into the day (2026-11-12): today's own strain plus each
+    #: earlier day's, halved for each day back (dashboard.carried_strain).
     value: float | None
     display: str
     is_rolling: bool
-    #: No training session this day: the card says "Rest" (2026-10-20).
+    #: No training session this day: the second line says "Rest" (2026-10-20).
     rest_day: bool = False
-    #: On a rest day, the 7 days before as their own line (strain of the mean load).
+    #: No longer sent (2026-11-12): the carried strain does its job.
     seven_day: float | None = None
+    today: StrainDayOwn | None = None
     card_label: str
     unscored_reason: str
     scale: float
@@ -433,6 +460,9 @@ class StrainSource(BaseModel):
 
 class StrainDetailOut(DetailFrame):
     is_rolling: bool
+    #: The day's own strain, under the carried figure of the masthead (2026-11-12).
+    today: StrainDayOwn | None = None
+    carry: StrainCarry | None = None
     #: Why there is no region panel: the stage could not be read (F7).
     stage_unread: str
     region: RegionPanel | None

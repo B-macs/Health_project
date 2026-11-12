@@ -101,6 +101,54 @@ def rolling_prior_strain(au_rows: list[dict], stage: int, today: date | None = N
     return round(sum(v or 0.0 for v in days) / 7, 1)
 
 
+#: The share of a day's strain still carried the next day: half (the owner,
+#: 2026-11-12, of three rates measured on his own days: *"lets start as half per
+#: day"*). Not fitted on him. It follows the time course of recovery after a
+#: resistance session: strength loss is largest at 24-48 h and mostly gone by
+#: about 72 h, and at half per day 1/8 is left after three days. The usual
+#: default of the fitness-fatigue model (a 7-day time constant) comes from fits
+#: on endurance athletes and read 39-64 on his days; fitted values differ
+#: widely between people and are unreliable (Hellard 2005, 2006). He means to
+#: fit his own rate later, from the check-in's tiredness and the heart rate of
+#: the same exercise at the same load (chest-strap sessions only).
+STRAIN_CARRY_PER_DAY = 0.5
+#: Days read back for the carried strain, today included. At half per day the
+#: oldest counts 1/8192 of its strain.
+STRAIN_CARRY_DAYS = 14
+
+
+def carried_strain(au_rows: list[dict], stage: int, today: date,
+                   hr_rows: list[dict] | None = None,
+                   walks: dict[str, list[dict]] | None = None) -> dict:
+    """The strain carried into `today` (the owner, 2026-11-12: *"I want to see
+    accumulate strain each day not the strain of just that day"*): today's own
+    strain plus each earlier day's, each day back counting STRAIN_CARRY_PER_DAY
+    as much as the day after it. Each day's strain is the figure its own card
+    shows (day_strain); a day with nothing counts 0.
+
+    {"value": the sum to one decimal, "days": the days that carried any
+    strain, newest first, each {"date", "strain", "share", "carried"}}.
+    Display only: the stored strain, the load ratio and every training
+    decision read the day's own load (Key Rule 2b)."""
+    days, total = [], 0.0
+    for k in range(STRAIN_CARRY_DAYS):
+        d = today - timedelta(days=k)
+        own = day_strain(d.isoformat(), au_rows, stage, hr_rows, walks)["strain"] or 0.0
+        share = STRAIN_CARRY_PER_DAY ** k
+        total += own * share
+        if own > 0:
+            days.append({"date": d, "strain": round(own, 1), "share": share,
+                         "carried": round(own * share, 1)})
+    return {"value": round(total, 1), "days": days}
+
+
+def carried_from_daily(daily: dict[str, float | None], day: date) -> float:
+    """carried_strain's sum over stored daily strains ({ISO date: strain}),
+    for the 30-day trend: a date with no value counts 0."""
+    return round(sum((daily.get((day - timedelta(days=k)).isoformat()) or 0.0)
+                     * STRAIN_CARRY_PER_DAY ** k for k in range(STRAIN_CARRY_DAYS)), 1)
+
+
 def sleep_percent(sleep_hours: float | None, sleep_need_hours: float) -> int | None:
     return round(sleep_hours / sleep_need_hours * 100) if sleep_hours else None
 
@@ -341,6 +389,31 @@ def strain_meta(score, is_rolling: bool = False, rest_day: bool = False) -> tupl
             "Hard":      "Significant load logged. Adequate recovery needed before next session.",
             "Strenuous": "One of your hardest days. Give recovery extra attention tonight.",
         }
+    return c, f"{s:.1f}", lbl, heads[lbl], descs[lbl]
+
+
+def carried_strain_meta(score) -> tuple:
+    """(colour, display, band, header, description) for the carried strain
+    (2026-11-12): the same 0-21 arc and the same bands as a day's strain (his
+    choice: "Same arc and words"), with words about load carried. The figure
+    can read above 21; the arc is then full."""
+    if score is None:
+        return "#555555", "--", "No Readings", "No workload logged", \
+               "No training data recorded for these days."
+    s = float(score)
+    light_below, moderate_below, hard_below = STRAIN_BANDS
+    if s < light_below:      c, lbl = "#6BAF8B", "Light"
+    elif s < moderate_below: c, lbl = "#BFA06A", "Moderate"
+    elif s < hard_below:     c, lbl = "#C47878", "Hard"
+    else:                    c, lbl = "#C47878", "Strenuous"
+    heads = {"Light": "Little load carried", "Moderate": "Some load carried",
+             "Hard": "High load carried", "Strenuous": "Very high load carried"}
+    descs = {
+        "Light":     "Little strain is left from the last days.",
+        "Moderate":  "Some strain from your recent sessions is still with you.",
+        "Hard":      "Much of the strain of your recent sessions is still with you.",
+        "Strenuous": "Strain has built up over the last days.",
+    }
     return c, f"{s:.1f}", lbl, heads[lbl], descs[lbl]
 
 

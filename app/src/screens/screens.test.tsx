@@ -68,12 +68,14 @@ describe('Today', () => {
     expect(html).not.toContain(S.fresh.saved)
   })
 
-  it('a rest day says so, with the 7 days before on their own line', () => {
-    const rest = { ...answer, strain: { ...answer.strain, value: 0, display: '0.0', label: 'Rest', rest_day: true, seven_day: 12.1 } }
+  // 2026-11-12: the tile's figure is the strain carried into the day; the day's own strain,
+  // "Rest" on a day with no session, is its second line.
+  it('a rest day shows the carried strain, with the day itself on its own line', () => {
+    const rest = { ...answer, strain: { ...answer.strain, value: 11.7, display: '11.7', label: 'Moderate', rest_day: true,
+      today: { value: 0, display: '0.0', label: 'Rest' } } }
     const html = text(draw(<TodayView view={fresh(rest)} week={week} plan={plan} shownDay={LOCAL} />))
-    expect(html).toContain('Rest')
-    expect(html).toContain(S.today.sevenDay('12.1'))
-    expect(text(draw(<TodayView view={fresh(answer)} week={week} plan={plan} shownDay={LOCAL} />))).not.toContain(S.today.sevenDay('12.1'))
+    expect(html).toContain('11.7')
+    expect(html).toContain(S.today.strainOwn(true, '0.0', 'Rest'))
   })
 
   it('with the engine down, the saved answer stays and says why', () => {
@@ -167,6 +169,22 @@ describe('the Readiness and Strain screens', () => {
     expect(html).toContain(d.masthead.display)
     expect(html).toContain('Lower body')
     expect(html).toContain(S.detail.showWeek)
+  })
+
+  // The carried strain (the owner, 2026-11-12): the figure at the top, the day's own strain
+  // under it, and each day that adds to it.
+  it('strain: the carried strain leads, with the day itself and how it adds up', () => {
+    const d = fx.strainDetail(LOCAL, LOCAL, false)
+    const html = text(draw(<DetailFrame heading={S.detail.strain} view={fresh(d)}>{(x) => <StrainBody d={x} onWeek={() => undefined} />}</DetailFrame>))
+    expect(html).toContain(S.detail.strainOwn(d.today!.display, d.today!.label))
+    expect(html).toContain(S.detail.carry)
+    expect(html).toContain(S.detail.carryIntro(0.5))
+    expect(html).toContain(S.detail.carryRow('6.0', S.detail.carryShare(0.5), '3.0'))
+    expect(html).toContain(S.detail.carryRow(d.carry!.days[0]!.strain.toFixed(1), 'in full', d.carry!.days[0]!.carried.toFixed(1)))
+    expect(S.detail.carryShare(0.125)).toBe('× 1/8')
+    const none = { ...d, carry: { per_day: 0.5, days: [] } }
+    expect(text(draw(<DetailFrame heading={S.detail.strain} view={fresh(none)}>{(x) => <StrainBody d={x} onWeek={() => undefined} />}</DetailFrame>)))
+      .toContain(S.detail.carryNone)
   })
 
   it('strain: the card says how the number was measured, and lists no exercise without a body area', () => {

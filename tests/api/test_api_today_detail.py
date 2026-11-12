@@ -318,7 +318,13 @@ def test_strain_detail_names_the_regions_and_the_stage_ceiling(monkeypatch):
     assert len(body["hrv_7d"]["dates"]) == 7 and body["hrv_7d"]["unit"] == "ms"
     assert body["hrv_7d"]["points"][-1]["rows"][0]["label"] == "Heart Rate Variability"
     assert body["source"]["kind"] == "rpe" and body["source"]["label"]
-    assert body["trend"]["axis"]["hi"] <= home.SCALES["strain"]
+    # The trend is the carried strain since 2026-11-12: it ends on the masthead's figure,
+    # and its axis reaches the highest carried value, which may pass the 0-21 scale.
+    trend = body["trend"]
+    assert trend["title"] == home_detail.CARRIED_TREND[1]
+    assert trend["headline"] == body["masthead"]["display"]
+    assert trend["axis"]["hi"] >= max(v for v in trend["values"] if v is not None)
+    assert body["carry"]["per_day"] == 0.5
 
 
 def test_the_region_acwr_starts_at_the_stage_active_on_the_day_shown(monkeypatch):
@@ -416,8 +422,10 @@ def test_a_rest_day_offers_the_week_and_shows_it_when_asked(monkeypatch):
     repo = HomeFake(session_days=range(1, 31, 2))
     day = _get(monkeypatch, repo, "/api/today/strain")
     # 2026-10-20: the day's own strain under its own title, said to be a rest day.
+    # 2026-11-12: the masthead is the carried strain; "Rest" is the day's own line.
     assert not day["is_rolling"] and day["title"] == strain_screen.strain_labels(False, "TODAY")[1]
-    assert day["masthead"]["label"] == "Rest"
+    assert day["today"]["label"] == "Rest" and day["today"]["display"] == "0.0"
+    assert day["masthead"]["label"] in ("Light", "Moderate", "Hard", "Strenuous")
     assert day["region"]["state"] == "empty" and day["region"]["reason"] == "rest_day"
     assert day["region"]["can_show_window"] and not day["region"]["showing_week"]
     week = _get(monkeypatch, repo, "/api/today/strain?week=true")["region"]

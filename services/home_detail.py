@@ -37,6 +37,8 @@ TRENDS = {
     "sleep": ("sleep_score", "Sleep Score", "Sleep Score Trend", 0, 0.0, 100.0),
     "strain": ("strain", "Strain", "Strain Trend", 1, 0.0, home.SCALES["strain"]),
 }
+#: The Strain screen's trend since 2026-11-12: the carried strain of each day.
+CARRIED_TREND = ("Carried strain", "Carried Strain Trend")
 #: Each detail screen's header title.
 TITLES = {"readiness": "Readiness History", "sleep": "Sleep History", "strain": "Strain History"}
 
@@ -124,6 +126,23 @@ def history_trend(view: str, metrics_history: list[dict], day: date) -> dict:
     dates, values, _latest = home.trend_series(metrics_history, day, key)
     return trend_chart(dates, values, title=title, label=label, decimals=decimals,
                        floor=floor, cap=cap, history=metrics_history, exclude=key)
+
+
+def carried_trend(metrics_history: list[dict], day: date, live: float | None) -> dict:
+    """The Strain screen's 30-day trend (2026-11-12): each day's carried strain
+    (dashboard.carried_from_daily) over the stored daily strains of Metrics
+    History, the fixed record. The day shown takes the live figure, so the
+    trend ends on the number the masthead shows."""
+    label, title = CARRIED_TREND
+    daily = {r.get("date"): _num(r.get("strain")) for r in metrics_history}
+    dates = home.trend_window(day)
+    values = [dash.carried_from_daily(daily, d) for d in dates]
+    if live is not None:
+        values[-1] = live
+    _key, _l, _t, decimals, floor, _cap = TRENDS["strain"]
+    # No cap: the carried strain can read above 21, and the axis must reach it.
+    return trend_chart(dates, values, title=title, label=label, decimals=decimals,
+                       floor=floor, cap=None, history=metrics_history, exclude="")
 
 
 def seven_day_chart(bio_rows: list[dict], day: date, key: str, title: str, unit: str) -> dict:
@@ -411,7 +430,11 @@ def strain_detail(repo, requested: date | None, caller_today: date, show_week: b
     label = home.date_label(day, caller_today)
     is_rolling = bool(snap["strain_is_rolling"])
     rest_day = bool(snap.get("rest_day"))
-    colour, display, band, _header, _desc = dash.strain_meta(snap["strain"], rest_day=rest_day)
+    # The masthead is the carried strain (2026-11-12); the day's own strain is
+    # its own line under it, with "Rest" on a day with no session.
+    colour, display, band, _header, _desc = dash.carried_strain_meta(snap.get("strain_carried"))
+    _o_col, own_display, own_band, _o_hdr, _o_desc = dash.strain_meta(snap["strain"],
+                                                                      rest_day=rest_day)
     _card, title = strain_screen.strain_labels(is_rolling, label)
     region = None
     if reads.stage is not None:
@@ -438,6 +461,10 @@ def strain_detail(repo, requested: date | None, caller_today: date, show_week: b
         "title": title,
         "masthead": {"colour": colour, "display": display, "label": band},
         "is_rolling": is_rolling,
+        "today": {"value": snap["strain"], "display": own_display, "label": own_band},
+        "carry": (None if snap.get("strain_carried") is None else
+                  {"per_day": dash.STRAIN_CARRY_PER_DAY,
+                   "days": list(snap.get("strain_carried_days") or [])}),
         "bio_failed": reads.bio_failed,
         "stage_unread": home.STAGE_UNREAD if reads.stage is None else "",
         "region": region,
@@ -445,7 +472,7 @@ def strain_detail(repo, requested: date | None, caller_today: date, show_week: b
         "hrv_7d": seven_day_chart(reads.bio_rows, day, "hrv_ms", "Heart Rate Variability", "ms"),
         "rhr_7d": seven_day_chart(reads.bio_rows, day, "resting_heart_rate",
                                   "Resting Heart Rate", "bpm"),
-        "trend": history_trend("strain", reads.metrics_history, day),
+        "trend": carried_trend(reads.metrics_history, day, snap.get("strain_carried")),
     }
 
 

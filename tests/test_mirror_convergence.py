@@ -103,6 +103,11 @@ def test_the_mirror_row_equals_the_stored_row_for_every_real_checkin(repo, conn)
         mirror = _normalized(nr.row_from_properties(nr.READINESS, page["properties"]))
         want = _normalized(stored[mirror["date"]])
         for column, value in mirror.items():
+            if column not in want:
+                # A column newer than the snapshot (tiredness_score, 2026-11-12): the
+                # snapshot's pages cannot hold it, so the mirror must read it empty.
+                assert value is None, f"{mirror['date']}.{column}: {value!r} from an older page"
+                continue
             assert value == want[column], (
                 f"{mirror['date']}.{column}: mirror {value!r} != rebuild {want[column]!r}"
             )

@@ -122,6 +122,14 @@ def snapshot(reads: HomeReads) -> dict:
     snap["sleep_need_hours"] = _need
     snap["sleep_base_window"] = base_window
     snap["strain_unscored_reason"] = STAGE_UNREAD if reads.stage is None else ""
+    # The strain carried into the day (2026-11-12), the Strain card's figure. Beside
+    # the day snapshot, not in it: that snapshot's keys are what Metrics History
+    # stores, and the carried figure is display only.
+    carried = ({"value": None, "days": []} if reads.stage is None else
+               dash.carried_strain(reads.au_rows, reads.stage, reads.day,
+                                   hr_rows=reads.hr_rows, walks=reads.walks))
+    snap["strain_carried"] = carried["value"]
+    snap["strain_carried_days"] = carried["days"]
     return snap
 
 
@@ -292,7 +300,11 @@ def cards(repo, requested: date | None, caller_today: date) -> dict:
         except Exception:
             verdict_out = None
     r_hdr, r_desc = readiness_words(r_hdr, r_desc, verdict_out)
-    s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(
+    # THE CARRIED STRAIN LEADS (the owner, 2026-11-12): the card's figure is the
+    # strain carried into the day (dashboard.carried_strain); the day's own
+    # strain, and "Rest" on a day with no session, are its second line.
+    s_col, s_disp, s_lbl, s_hdr, s_desc = dash.carried_strain_meta(snap.get("strain_carried"))
+    _o_col, own_disp, own_lbl, _o_hdr, _o_desc = dash.strain_meta(
         snap["strain"], rest_day=bool(snap.get("rest_day")))
     if snap["strain_unscored_reason"]:
         # Not "no workload logged": the load may well be there, the stage is not.
@@ -310,11 +322,12 @@ def cards(repo, requested: date | None, caller_today: date) -> dict:
                       "colour": r_col, "label": r_lbl, "header": r_hdr,
                       "description": r_desc, "tertiary": r_tert,
                       "scale": SCALES["readiness"]},
-        "strain": {"value": snap["strain"], "display": s_disp,
+        "strain": {"value": snap.get("strain_carried"), "display": s_disp,
                    "is_rolling": bool(snap["strain_is_rolling"]),
-                   # A rest day says so and shows the 7 days before as its own line.
                    "rest_day": bool(snap.get("rest_day")),
-                   "seven_day": snap.get("strain_7d") if snap.get("rest_day") else None,
+                   # The carried figure does the 7-day average's job (2026-11-12).
+                   "seven_day": None,
+                   "today": {"value": snap["strain"], "display": own_disp, "label": own_lbl},
                    "card_label": strain_card_label, "colour": s_col, "label": s_lbl,
                    "header": s_hdr, "description": s_desc,
                    "unscored_reason": snap["strain_unscored_reason"],

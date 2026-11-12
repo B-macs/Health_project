@@ -3465,8 +3465,51 @@ export interface components {
             scale: number;
             /** Seven Day */
             seven_day?: number | null;
+            today?: components["schemas"]["StrainDayOwn"] | null;
             /** Unscored Reason */
             unscored_reason: string;
+            /** Value */
+            value: number | null;
+        };
+        /**
+         * StrainCarriedDay
+         * @description One day that adds to the carried strain: its own strain, the share of it
+         *     still carried on the day shown, and that part.
+         */
+        StrainCarriedDay: {
+            /** Carried */
+            carried: number;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Share */
+            share: number;
+            /** Strain */
+            strain: number;
+        };
+        /**
+         * StrainCarry
+         * @description How the carried strain adds up (2026-11-12): the share carried from one
+         *     day to the next, and each day that carried any strain, newest first.
+         */
+        StrainCarry: {
+            /** Days */
+            days: components["schemas"]["StrainCarriedDay"][];
+            /** Per Day */
+            per_day: number;
+        };
+        /**
+         * StrainDayOwn
+         * @description The day's own strain (its sessions and walks), and its band ("Rest" on a
+         *     day with no session): the card's second line since 2026-11-12.
+         */
+        StrainDayOwn: {
+            /** Display */
+            display: string;
+            /** Label */
+            label: string;
             /** Value */
             value: number | null;
         };
@@ -3474,6 +3517,7 @@ export interface components {
         StrainDetailOut: {
             /** Bio Failed */
             bio_failed: boolean;
+            carry?: components["schemas"]["StrainCarry"] | null;
             /**
              * Date
              * Format: date
@@ -3503,6 +3547,7 @@ export interface components {
             stage_unread: string;
             /** Title */
             title: string;
+            today?: components["schemas"]["StrainDayOwn"] | null;
             trend: components["schemas"]["TrendChart"];
         };
         /** StrainSource */
