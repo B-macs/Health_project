@@ -16,7 +16,7 @@ import {
   type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
-import { reminderLine, secondTileTitle, trainingDayLine } from './Daily'
+import { DAILY, dailyAddress, reminderLine, secondTileTitle, trainingDayLine } from './Daily'
 import { arrivalTimer, backLabel, SessionFlow } from './Session'
 import { HeartRateMatch, holdsDone, HOLD_MAX_MS, reviewLine, SessionSave, type Queued } from './SessionSave'
 import { Banner, longDate, noSessionLine, noSessionReason, TrainedToday, trainedToday } from './TrainingTab'
@@ -616,6 +616,11 @@ describe('the evening mobility session (2026-11-11)', () => {
     expect(secondTileTitle(mobility)).toBe(S.daily.mobilityTitle)
     expect(secondTileTitle(daily)).toBe(S.daily.dailyTitle)
     expect(secondTileTitle(null)).toBe(S.daily.dailyTitle)
+  })
+
+  it('the second tile asks for the day picked in the strip; today has no date in its address', () => {
+    expect(dailyAddress('2026-11-18', '2026-11-18')).toBe(DAILY)
+    expect(dailyAddress('2026-11-19', '2026-11-18')).toBe(`${DAILY}?date=2026-11-19`)
   })
 
   it('the save screen says it is the evening session and never the training day', () => {

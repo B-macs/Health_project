@@ -416,10 +416,14 @@ export function accessoryPlan(local: string) {
 /** The daily tendon session (WP-40, dev/daily_fixture.json, made by the engine's walk).
  *  `daily_before`: today's gym session is still to come; `daily_rest`: no reminder line;
  *  `daily_done`: a daily session is already logged today. */
-export function dailyPlan(local: string, scenario: Set<string>) {
-  const reminder = scenario.has('daily_rest') ? null
+export function dailyPlan(local: string, scenario: Set<string>, asked: string | null = null) {
+  const day = asked ?? local
+  // `mobility_today` (2026-11-18): today's evening is the mobility session, every other day
+  // the tendon session, as the engine answers for the day picked in the strip.
+  const kind = scenario.has('mobility_today') && day === local ? 'mobility' : daily.kind
+  const reminder = day !== local || kind === 'mobility' || scenario.has('daily_rest') ? null
     : scenario.has('daily_before') ? { kind: 'before' as const, time: null } : daily.reminder
-  return { ...daily, date: local, reminder, done_today: scenario.has('daily_done') }
+  return { ...daily, kind, date: day, reminder, done_today: day === local && scenario.has('daily_done') }
 }
 
 /** The EGYM circuit (2026-11-08, dev/egym_fixture.json, made by the engine's walk). */

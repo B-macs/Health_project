@@ -139,7 +139,7 @@ def is_evening(phases, d: date, today: date | None = None, trained_on=None) -> b
             and not training(d + timedelta(days=1)))
 
 
-def is_due(phases, today: date, done_on=(), trained_on=None) -> bool:
+def is_due(phases, today: date, done_on=(), trained_on=None, asked_on: date | None = None) -> bool:
     """The evening session is due today.
 
     A MOVE NEVER ADDS AN EVENING (the athlete, 2026-11-11: "when I move the
@@ -150,12 +150,18 @@ def is_due(phases, today: date, done_on=(), trained_on=None) -> bool:
     on. So with Tuesday's evening done and Thursday's C moved to Wednesday,
     Wednesday (B Tuesday, C Wednesday, rest Thursday) has none; with Tuesday's
     not done, Wednesday has one. `trained_on`: the days with a logged plan
-    session (is_training_day)."""
-    if not is_evening(phases, today, today, trained_on):
+    session (is_training_day).
+
+    `asked_on`: the day the question is asked, when it is not `today` (the week
+    page's tile for another day, 2026-11-18: "When I select each day today every
+    one of them is mobility ? Tomorrow should be tendon?"). The days before it
+    count by the log, it and the days after it by the plan."""
+    asked = asked_on or today
+    if not is_evening(phases, today, asked, trained_on):
         return False
     monday = today - timedelta(days=today.weekday())
     evenings = [d for d in (monday + timedelta(days=i) for i in range(7))
-                if is_evening(phases, d, today, trained_on)]
+                if is_evening(phases, d, asked, trained_on)]
     done = sum(1 for d in set(done_on) if monday <= d < today)
     owed = min(WEEKLY_EVENINGS, len(evenings)) - done
     if owed <= 0:

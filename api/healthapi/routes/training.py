@@ -151,14 +151,17 @@ def get_accessory(today: date = Depends(local_today),
 
 
 @router.get("/api/training/daily", response_model=SessionPlanOut)
-def get_daily(today: date = Depends(local_today),
+def get_daily(day: date | None = Query(default=None, alias="date"),
+              today: date = Depends(local_today),
               repo: Repository = Depends(get_repository)) -> dict:
-    """The Training tab's second tile: on the evening of a strength day with
-    no strength the next day, the evening mobility session (kind mobility,
-    2026-11-11); on every other day the daily tendon session (WP-40) with its
-    8-hour line. Either says whether it is done today. Never refused for the
-    time of day: when to do it is the athlete's decision."""
-    return _session(lambda: tsession.daily_plan(repo, today))
+    """The Training tab's second tile: on the evening of the second of two
+    training days with no strength the next day, the evening mobility session
+    (kind mobility, 2026-11-11 and 2026-11-18); on every other day the daily
+    tendon session (WP-40) with its 8-hour line. Either says whether it is done
+    that day. `date`: the day picked in the week strip (today when absent).
+    Never refused for the time of day: when to do it is the athlete's
+    decision."""
+    return _session(lambda: tsession.daily_plan(repo, today, day))
 
 
 @router.get("/api/training/egym", response_model=SessionPlanOut)

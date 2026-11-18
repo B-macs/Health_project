@@ -428,48 +428,57 @@ def accessory_plan(repo, today: date) -> dict:
     return out
 
 
-def daily_plan(repo, today: date) -> dict:
-    """The Training tab's second tile for today. On the evening of a strength
-    day with no strength the next day it is the evening mobility session
-    (mobility_session.is_due, the athlete's rule of 2026-11-11: "The mobility
-    training will replace the tendon training on those days"); on every other
-    day the daily tendon session (WP-40), with its 8-hour line. Either one says
-    whether it is done today, and either is offered whatever was done: when to
-    do it is the athlete's decision, never a lock. Unreadable phases give the
-    tendon session, which runs on any day."""
+def daily_plan(repo, today: date, day: date | None = None) -> dict:
+    """The Training tab's second tile for `day` (today when None). On the
+    evening of the second of two training days with no strength the next day it
+    is the evening mobility session (mobility_session.is_due, the athlete's rule
+    of 2026-11-11 and 2026-11-18: "The mobility training will replace the tendon
+    training on those days"); on every other day the daily tendon session
+    (WP-40), with its 8-hour line on today only. Either one says whether it is
+    done that day, and either is offered whatever was done: when to do it is the
+    athlete's decision, never a lock. Unreadable phases give the tendon
+    session, which runs on any day.
+
+    ANOTHER DAY (2026-11-18: "When I select each day today every one of them is
+    mobility ? Tomorrow should be tendon?"): the week page's tile follows the
+    day picked in the strip. A day ahead is read as the plan stands today, a day
+    before today as the log has it (mobility_session.is_due's `asked_on`)."""
+    d = day or today
     r = ts.read(repo, today)
     decided = ts.todays_decision(repo, r.phases, today)
-    day_sessions = dly.read_day_sessions(repo, today)
-    # An evening done today stays on the tile, done, even when a move later
-    # takes today's evening away; an evening done earlier this week is not owed
+    day_sessions = dly.read_day_sessions(repo, d)
+    # An evening done that day stays on the tile, done, even when a move later
+    # takes its evening away; an evening done earlier that week is not owed
     # again (mobility_session.is_due, 2026-11-11).
-    monday = today - timedelta(days=today.weekday())
-    done_on = [d for d in (monday + timedelta(days=i) for i in range(today.weekday()))
-               if mob.done_today(dly.read_day_sessions(repo, d))]
+    monday = d - timedelta(days=d.weekday())
+    done_on = [x for x in (monday + timedelta(days=i) for i in range(d.weekday()))
+               if x <= today and mob.done_today(dly.read_day_sessions(repo, x))]
     # The days trained: the evening is on the second of two training days in a
     # row (2026-11-18), and a day before today counts only when it was trained.
     # A log that cannot be read gives the tendon session, which runs any day.
     try:
-        trained_on = {date.fromisoformat(d) for d in repo.get_logged_session_dates(
-            monday - timedelta(days=1), today, include_supplementary=False)}
+        trained_on = {date.fromisoformat(x) for x in repo.get_logged_session_dates(
+            min(monday, today) - timedelta(days=1), today, include_supplementary=False)}
     except Exception:
         trained_on = None
     if not r.phases_error and (mob.done_today(day_sessions) or (
-            trained_on is not None and mob.is_due(r.phases, today, done_on, trained_on))):
+            trained_on is not None
+            and mob.is_due(r.phases, d, done_on, trained_on, asked_on=today))):
         # The front split stack for his latest front split test (2026-11-11);
         # before the first test, the last stack a test prescribed.
         pattern = mob.front_split_pattern(repo, today)
-        out = compose(repo, today, kind=MOBILITY, day_num=None, content=mob.build_day(pattern),
+        out = compose(repo, d, kind=MOBILITY, day_num=None, content=mob.build_day(pattern),
                       decided=decided)
         out["next_day"] = None
         out["note"] = mob.note(pattern)
         out["reminder"] = None
         out["done_today"] = mob.done_today(day_sessions)
         return out
-    out = compose(repo, today, kind=DAILY, day_num=None, content=dly.build_day(), decided=decided)
+    out = compose(repo, d, kind=DAILY, day_num=None, content=dly.build_day(), decided=decided)
     out["next_day"] = None
     out["note"] = dly.dt.NOTE
-    out["reminder"] = dly.reminder(day_sessions, _plan_still_to_do(repo, r, today))
+    out["reminder"] = (dly.reminder(day_sessions, _plan_still_to_do(repo, r, today))
+                       if d == today else None)
     out["done_today"] = dly.done_today(day_sessions)
     return out
 

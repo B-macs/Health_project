@@ -17,6 +17,9 @@
 //   strength the next day the engine answers the same address with kind 'mobility' ("The
 //   mobility training will replace the tendon training on those days"). The engine decides
 //   the day; the phone only shows the answer, with its own title and no gelatin line.
+// - The day picked in the strip (2026-11-18: "When I select each day today every one of them
+//   is mobility ? Tomorrow should be tendon?"): the second tile asks the engine for that day
+//   (?date=), and opens that day's session to read; Start is offered on the day itself only.
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import type { components } from '../generated/api'
@@ -30,13 +33,19 @@ import { S } from '../strings'
 import { Freshness } from '../ui/Freshness'
 import { Timeline } from '../ui/timeline'
 import { Head } from './Extras'
-import { trainedToday } from './TrainingTab'
+import { longDate, trainedToday } from './TrainingTab'
 
 type Schemas = components['schemas']
 type DayPlan = Schemas['TrainingDayOut']
 type Reminder = Schemas['DailyReminder']
 
 export const DAILY = '/api/training/daily'
+
+/** The second tile's address for a day: today's has no date in it, so the phone keeps one
+ *  answer for "today" whatever the date (the same rule as the day's own address). */
+export function dailyAddress(day: string, today: string): string {
+  return day === today ? DAILY : `${DAILY}?date=${day}`
+}
 
 /** The 8-hour line, or null (a rest day, or nothing known). */
 export function reminderLine(r: Reminder | null | undefined): string | null {
@@ -72,38 +81,46 @@ export function secondTileTitle(plan: Plan | null | undefined): string {
   return plan?.kind === 'mobility' ? S.daily.mobilityTitle : S.daily.dailyTitle
 }
 
-/** The two tiles, side by side, under the week page's week dates. */
-export function TrainingTiles({ onTrainingDay }: { onTrainingDay: () => void }) {
+/** The two tiles, side by side, under the week page's week dates. The second one follows
+ *  the day picked in the strip (`selected`): that day's tendon or mobility session. */
+export function TrainingTiles({ onTrainingDay, selected }: { onTrainingDay: () => void; selected?: string }) {
   const { store, ctx, go } = useApp()
   const today = localDay()
+  const picked = selected ?? today
   const day = useCached<DayPlan>(store, '/api/training/day', null, ctx, { today: true })
-  const daily = useCached<Plan>(store, DAILY, null, ctx, { today: true })
+  const daily = useCached<Plan>(store, dailyAddress(picked, today), null, ctx, { today: picked === today })
   const savedOn = useLiveQuery(async () => (await store.settings.get(KEYS.trainedOn))?.value ?? null, [store])
-  const d = daily.data && daily.data.date === today ? daily.data : null
+  const d = daily.data && daily.data.date === picked ? daily.data : null
+  const isToday = picked === today
   return (
     <div className="pair tiles" data-testid="training-tiles">
       <Tile title={S.daily.trainingDay} testId="tile-training-day" current onOpen={onTrainingDay}
         line={trainingDayLine(day.data, savedOn, today)} note={null} />
-      <Tile title={secondTileTitle(d)} testId="tile-daily" onOpen={() => go('/training/daily')}
-        line={d?.done_today ? S.daily.doneToday : S.daily.minutes(d?.model_minutes ?? null)}
-        note={reminderLine(d?.reminder)} />
+      <Tile title={secondTileTitle(d)} testId="tile-daily"
+        onOpen={() => go(isToday ? '/training/daily' : `/training/daily/${picked}`)}
+        line={d?.done_today ? (isToday ? S.daily.doneToday : S.daily.doneThatDay)
+          : S.daily.minutes(d?.model_minutes ?? null)}
+        note={isToday ? reminderLine(d?.reminder) : null} />
     </div>
   )
 }
 
 /** The second tile's session before Start: the entries, the 8-hour line and the gelatin line
- *  (the tendon session only), the note, each item's how-to, and Start (never locked). */
-export function DailyOverview() {
+ *  (the tendon session only), the note, each item's how-to, and Start (never locked). For a
+ *  day other than today (`day`, picked in the strip) the same page to read, with no Start. */
+export function DailyOverview({ day }: { day?: string } = {}) {
   const { store, ctx, go } = useApp()
-  const view = useCached<Plan>(store, DAILY, null, ctx, { today: true })
+  const today = localDay()
+  const wanted = day ?? today
+  const other = wanted !== today
+  const view = useCached<Plan>(store, dailyAddress(wanted, today), null, ctx, { today: !other })
   const busy = useLiveQuery(async () => (await store.session.get('current')) !== undefined, [store], false)
   const [starting, setStarting] = useState(false)
-  const today = localDay()
-  const plan = view.data && view.data.date === today
+  const plan = view.data && view.data.date === wanted
     && (view.data.kind === 'daily' || view.data.kind === 'mobility') ? view.data : null
   const mobility = plan?.kind === 'mobility'
   const start = async () => {
-    if (!plan || starting) return
+    if (!plan || starting || other) return
     setStarting(true)
     try {
       // One session at a time: a session already kept on this phone is never replaced.
@@ -124,7 +141,8 @@ export function DailyOverview() {
         caption={!plan ? undefined : mobility ? S.daily.mobilityCaption(plan.exercises.length, plan.model_minutes)
           : S.daily.rounds(plan.exercises.length, plan.model_minutes)} />
       <Freshness view={view} />
-      {busy && <p className="alert" data-testid="daily-blocked">{S.daily.blocked}</p>}
+      {other && <p className="caption" data-testid="daily-other-day">{S.daily.otherDay(longDate(wanted))}</p>}
+      {busy && !other && <p className="alert" data-testid="daily-blocked">{S.daily.blocked}</p>}
       {!plan ? (
         view.state !== 'loading' && <p className="caption">{S.daily.needsEngine}</p>
       ) : (
@@ -147,8 +165,10 @@ export function DailyOverview() {
           </section>
           <div className="pair">
             <button className="btn btn--glass btn--gym" onClick={() => go('/training')}>{S.daily.cancel}</button>
-            <button className="btn btn--primary btn--gym" data-testid="daily-start" disabled={busy || starting}
-              onClick={() => void start()}>{plan.done_today ? S.daily.again : S.daily.start}</button>
+            {!other && (
+              <button className="btn btn--primary btn--gym" data-testid="daily-start" disabled={busy || starting}
+                onClick={() => void start()}>{plan.done_today ? S.daily.again : S.daily.start}</button>
+            )}
           </div>
         </>
       )}

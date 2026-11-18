@@ -371,6 +371,9 @@ export const S = {
     after: (time: string) => `8 hours after your gym session: from ${time}`,
     before: 'Keep 8 hours before your gym session.',
     doneToday: 'Done today',
+    // Another day picked in the week strip (2026-11-18): that day's session, to read.
+    doneThatDay: 'Done that day',
+    otherDay: (date: string) => `The session for ${date}. You can start it on the day itself.`,
     rounds: (n: number, minutes: number) => `3 rounds · ${n} entries · about ${minutes} min`,
     gelatin: 'Gelatin: about 15 g with about 200 mg vitamin C, 30–60 minutes before.',
     howTo: 'How to do it',

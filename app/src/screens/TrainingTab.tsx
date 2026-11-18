@@ -397,7 +397,7 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
         </button>
       </header>
       <WeekBody key={confirmed + cleared} weekStart={weekStart} setWeekStart={setWeekStart}
-        tiles={<TrainingTiles onTrainingDay={() => { setWeekStart(null); setSelected(today) }} />}
+        tiles={<TrainingTiles selected={selected} onTrainingDay={() => { setWeekStart(null); setSelected(today) }} />}
         homeWeek={homeWeek} setHomeWeek={setHomeWeek}
         selected={selected} setSelected={setSelected} answered={answered} answer={answer} rows={rows}
         onStart={onStart} starting={starting} onClear={clear} />
@@ -410,7 +410,7 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
  *  address, or "day": the week page, with the two tiles under its week dates. */
 export type Extra = 'day' | 'daily' | 'yoga' | 'outdoor' | 'accessory' | 'egym'
 
-export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
+export function TrainingTab({ extra, slug, day }: { extra?: Extra; slug?: string; day?: string }) {
   const { store, go } = useApp()
   // undefined while the database is read; null when no session is kept.
   const row = useLiveQuery(async () => (await store.session.get('current')) ?? null, [store])
@@ -444,6 +444,6 @@ export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
   if (extra === 'outdoor') return <Outdoor />
   if (extra === 'accessory') return <AccessoryOverview />
   if (extra === 'egym') return <EgymOverview />
-  if (extra === 'daily') return <DailyOverview />
+  if (extra === 'daily') return <DailyOverview day={day} />
   return <WeekPage onStart={(p, garmin) => void start(p, garmin)} starting={starting} />
 }

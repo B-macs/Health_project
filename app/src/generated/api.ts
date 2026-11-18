@@ -648,11 +648,13 @@ export interface paths {
         };
         /**
          * Get Daily
-         * @description The Training tab's second tile: on the evening of a strength day with
-         *     no strength the next day, the evening mobility session (kind mobility,
-         *     2026-11-11); on every other day the daily tendon session (WP-40) with its
-         *     8-hour line. Either says whether it is done today. Never refused for the
-         *     time of day: when to do it is the athlete's decision.
+         * @description The Training tab's second tile: on the evening of the second of two
+         *     training days with no strength the next day, the evening mobility session
+         *     (kind mobility, 2026-11-11 and 2026-11-18); on every other day the daily
+         *     tendon session (WP-40) with its 8-hour line. Either says whether it is done
+         *     that day. `date`: the day picked in the week strip (today when absent).
+         *     Never refused for the time of day: when to do it is the athlete's
+         *     decision.
          */
         get: operations["get_daily_api_training_daily_get"];
         put?: never;
@@ -5747,7 +5749,9 @@ export interface operations {
     };
     get_daily_api_training_daily_get: {
         parameters: {
-            query?: never;
+            query?: {
+                date?: string | null;
+            };
             header?: {
                 "x-engine-key"?: string | null;
                 "x-local-date"?: string | null;

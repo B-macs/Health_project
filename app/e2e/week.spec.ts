@@ -165,6 +165,22 @@ test('a move the engine refuses says why, and OK clears it', async ({ page, cont
   expect(await outboxLength(page)).toBe(0)
 })
 
+test('the second tile follows the day picked in the strip: tonight is mobility, tomorrow the tendon session, to read without Start', async ({ page, context }) => {
+  await onboard(page)
+  await scenario(context, `e2e-tile-day-${Date.now()}`, 'mobility_today')
+  await openTab(page, S.nav.training)
+  const tile = page.getByTestId('tile-daily')
+  await expect(tile).toContainText(S.daily.mobilityTitle)
+  await strip(page).locator('[data-marker="planned"]').first().click()
+  await expect(tile).toContainText(S.daily.dailyTitle)
+  await tile.click()
+  await expect(page.getByTestId('daily-other-day')).toBeVisible()
+  await expect(page.getByTestId('daily')).toContainText(S.daily.dailyTitle)
+  await expect(page.getByTestId('daily-start')).toHaveCount(0)
+  await page.getByRole('button', { name: S.daily.cancel }).click()
+  await expect(page.getByTestId('week-page')).toBeVisible()
+})
+
 test('the Training tab opens on the week page: the week dates first, then the two tiles side by side; the daily tendon session runs its slow start and saves as its own kind (WP-40)', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-daily-${Date.now()}`)

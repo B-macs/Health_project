@@ -4,6 +4,8 @@
 
 
 ## Now
+**2026-11-18, his question ("When I select each day today every one of them is mobility ?"):** both tiles read today's answers, so the second tile showed tonight's mobility on every picked day. `GET /api/training/daily?date=` answers for a day; the phone's tile asks for the picked day and opens that day's session to read (`/training/daily/<date>`, no Start). Engine and phone app.
+
 **2026-11-18, his question ("Why is every day now mobility training"):** the evening mobility rule never read the day before, so a missed day put the evening on the day after it until the week moved (Tue 10 and Wed 11 Nov; Tue 17 until 12:06 and Wed 18 Nov). His answers: the evening is on the second of two training days in a row (yesterday trained, today strength, tomorrow rest), and mobility still replaces the tendon session on it. `mobility_session.is_training_day`; engine only.
 
 **2026-11-11, his request to find the missed watch sessions on the Garmin server:** the match had searched Garmin's 20 newest activities, so the 35-day catch-up could never match an older session; it now searches the session's own day. `scripts/backfill_session_hr.py --from 2026-08-01 --shift 2026-08-06=2 --apply` stored 8 matches (6, 12, 14, 16, 18, 20, 24 Aug, 11 Nov) after an off-site backup, read back 8 of 8; 11 sessions have no Garmin activity, 5 Aug's walk is not the session.

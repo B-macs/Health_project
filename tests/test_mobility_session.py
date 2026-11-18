@@ -157,6 +157,20 @@ def test_a_done_evening_in_a_normal_week_leaves_the_second_one():
     assert mob.is_due(phases, friday, done_on=[_week(4)[4]])
 
 
+def test_a_day_ahead_is_read_by_the_plan_as_it_stands_today():
+    """The week page's tile for another day (2026-11-18: "When I select each
+    day today every one of them is mobility ? Tomorrow should be tendon?"):
+    asked on Tuesday with Monday trained, Friday's evening counts Thursday's C
+    by its plan; asked on Friday itself, Thursday counts only if it was trained."""
+    phases = _phases()
+    mon, tue, wed, thu, fri = _week(5)[:5]
+    assert mob.is_due(phases, fri, trained_on={mon}, asked_on=tue)
+    assert not mob.is_due(phases, wed, trained_on={mon}, asked_on=tue), "a rest day"
+    assert not mob.is_due(phases, thu, trained_on={mon}, asked_on=tue), "Friday is strength"
+    assert not mob.is_due(phases, fri, trained_on={mon, tue})
+    assert not mob.is_due(phases, mon, trained_on={mon}, asked_on=tue), "Sunday was not a training day"
+
+
 def test_a_forced_rest_has_no_evening_and_a_strength_day_it_leaves_alone_has_none():
     phases = _phases(**{"2026-11-16": 0})              # Monday of week 5 forced rest
     assert not mob.is_due(phases, date(2026, 11, 16))

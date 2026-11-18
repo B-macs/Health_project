@@ -12890,9 +12890,26 @@
     },
     "/api/training/daily": {
       "get": {
-        "description": "The Training tab's second tile: on the evening of a strength day with\nno strength the next day, the evening mobility session (kind mobility,\n2026-11-11); on every other day the daily tendon session (WP-40) with its\n8-hour line. Either says whether it is done today. Never refused for the\ntime of day: when to do it is the athlete's decision.",
+        "description": "The Training tab's second tile: on the evening of the second of two\ntraining days with no strength the next day, the evening mobility session\n(kind mobility, 2026-11-11 and 2026-11-18); on every other day the daily\ntendon session (WP-40) with its 8-hour line. Either says whether it is done\nthat day. `date`: the day picked in the week strip (today when absent).\nNever refused for the time of day: when to do it is the athlete's\ndecision.",
         "operationId": "get_daily_api_training_daily_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
           {
             "in": "header",
             "name": "x-engine-key",

@@ -492,6 +492,28 @@ def test_after_the_front_split_test_the_evening_runs_its_stack(env, monkeypatch)
         e["name"] for e in gb.FRONT_SPLIT_STACKS["H"]]
 
 
+def test_the_tile_follows_the_day_picked_in_the_strip(env, monkeypatch):
+    """The athlete, 2026-11-18: "When I select each day today every one of them
+    is mobility ? Tomorrow should be tendon?". In week 1, asked on Tuesday with
+    Monday trained: each day's own session, dated that day; the 8-hour line on
+    today only. Wednesday's rest and Thursday's C (Friday is strength) are the
+    tendon session; Friday (C Thursday, D Friday, rest Saturday) and today are
+    the evening; Monday, after a day off, the tendon session."""
+    _log_plan_session(env, monkeypatch, MONDAY)
+    kinds = {}
+    for i in range(7):
+        d = MONDAY + timedelta(days=i)
+        plan = env.ok(monkeypatch, "get", f"/api/training/daily?date={d}", local=TUESDAY)
+        assert plan["date"] == d.isoformat()
+        if d != TUESDAY:
+            assert plan["reminder"] is None, d
+        kinds[d.strftime("%a")] = plan["kind"]
+    assert kinds == {"Mon": "daily", "Tue": "mobility", "Wed": "daily", "Thu": "daily",
+                     "Fri": "mobility", "Sat": "daily", "Sun": "daily"}
+    no_date = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
+    assert no_date["kind"] == "mobility" and no_date["date"] == TUESDAY.isoformat()
+
+
 def test_an_evening_done_before_a_move_is_not_offered_again(env, monkeypatch):
     """The athlete, 2026-11-11: "when I move the Friday training to Thursday
     the evening mobility if not performed goes to Thursday". In week 1: A and B
