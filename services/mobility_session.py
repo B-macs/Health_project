@@ -14,6 +14,18 @@ tendon training on those days." His two answers the same day:
   strength session and whose next day's is not (is_due). It moves when the
   sessions move (date_overrides); in a normal week it is Tuesday and Friday.
 
+THE SECOND OF TWO TRAINING DAYS IN A ROW (the athlete, 2026-11-18: "mobility
+only when there is a rest day the next day after the two days of training";
+his answer the same day: yesterday trained, today a strength day, tomorrow
+rest). Until then the day before was never read, so a missed Monday put the
+evening on Tuesday (B still there, rest on Wednesday) until the week was moved,
+and the moved B put it on Wednesday too: two evenings in a row, in the weeks of
+9 and 16 Nov. A day before today counts as a training day only when a plan
+session was logged on it (is_training_day); today and the days after it count
+by the schedule. A strength day alone (after a missed day, or after a rest day)
+has no evening. On its evenings the session still replaces the tendon session
+(his answer the same day: "Mobility replaces tendon").
+
 THE THREE LAYERS, the daily session's pattern (services/daily_session.py):
 
     goal_block.py                 WHAT  — the stack, its doses and records
@@ -103,15 +115,31 @@ def is_strength_day(day: dict | None) -> bool:
 WEEKLY_EVENINGS = 2
 
 
-def is_evening(phases, d: date) -> bool:
-    """`d`'s scheduled plan day is a strength session and the next day's is not
-    (his rule, 2026-11-11). The schedule decides, not the log: a strength day
-    not yet trained at the time of asking still has its evening."""
-    return (is_strength_day(scheduled_day(phases, d))
-            and not is_strength_day(scheduled_day(phases, d + timedelta(days=1))))
+def is_training_day(phases, d: date, today: date | None = None, trained_on=None) -> bool:
+    """`d` counts as a training day. Before `today`, a plan session was logged
+    on it (`trained_on`, the dates); `today` and the days after it, its
+    scheduled plan day is a strength session (today also when one is logged
+    there). Without `trained_on` (None) every day counts by the schedule: the
+    plan's own week."""
+    if trained_on is None or today is None:
+        return is_strength_day(scheduled_day(phases, d))
+    if d < today:
+        return d in trained_on
+    return is_strength_day(scheduled_day(phases, d)) or (d == today and d in trained_on)
 
 
-def is_due(phases, today: date, done_on=()) -> bool:
+def is_evening(phases, d: date, today: date | None = None, trained_on=None) -> bool:
+    """`d` is the second of two training days in a row and the next day is not
+    one (his rule, 2026-11-18): the day before was trained, `d` is a strength
+    day, the day after is a rest day (is_training_day). A strength day not yet
+    trained at the time of asking still has its evening."""
+    def training(x: date) -> bool:
+        return is_training_day(phases, x, today, trained_on)
+    return (training(d - timedelta(days=1)) and training(d)
+            and not training(d + timedelta(days=1)))
+
+
+def is_due(phases, today: date, done_on=(), trained_on=None) -> bool:
     """The evening session is due today.
 
     A MOVE NEVER ADDS AN EVENING (the athlete, 2026-11-11: "when I move the
@@ -119,13 +147,15 @@ def is_due(phases, today: date, done_on=()) -> bool:
     Thursday"). The week owes WEEKLY_EVENINGS, or fewer when it has fewer
     evenings, less the evening sessions done before today (`done_on`, the days
     with one logged); the evenings it still owes are its last ones from today
-    on. So with Wednesday's evening done and Friday's C moved to Thursday, the
-    one still owed is Saturday's, and Thursday has none; with Wednesday's not
-    done, Thursday and Saturday both have one."""
-    if not is_evening(phases, today):
+    on. So with Tuesday's evening done and Thursday's C moved to Wednesday,
+    Wednesday (B Tuesday, C Wednesday, rest Thursday) has none; with Tuesday's
+    not done, Wednesday has one. `trained_on`: the days with a logged plan
+    session (is_training_day)."""
+    if not is_evening(phases, today, today, trained_on):
         return False
     monday = today - timedelta(days=today.weekday())
-    evenings = [d for d in (monday + timedelta(days=i) for i in range(7)) if is_evening(phases, d)]
+    evenings = [d for d in (monday + timedelta(days=i) for i in range(7))
+                if is_evening(phases, d, today, trained_on)]
     done = sum(1 for d in set(done_on) if monday <= d < today)
     owed = min(WEEKLY_EVENINGS, len(evenings)) - done
     if owed <= 0:

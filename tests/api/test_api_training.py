@@ -445,8 +445,13 @@ def test_a_strength_day_before_a_rest_day_offers_the_evening_mobility_session(en
     Tuesday (B) is before Wednesday's rest: the second tile's address answers
     with the Sunday stack, no 8-hour line and the plan's own time model. With
     no front split test taken yet (the goal from 2026-11-11), the stack is the
-    last one a test prescribed and the note asks for the front split test."""
+    last one a test prescribed and the note asks for the front split test.
+    Only with Monday trained (2026-11-18: "mobility only when there is a rest
+    day the next day after the two days of training"): without it, the tendon
+    session."""
     from services import mobility_session as mob
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)["kind"] == "daily"
+    _log_plan_session(env, monkeypatch, MONDAY)
     plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
     assert plan["kind"] == "mobility" and plan["plan_days"] is None
     assert [e["name"] for e in plan["exercises"]] == [e["name"] for e in gb.FLEX_STACK]
@@ -480,6 +485,7 @@ def test_after_the_front_split_test_the_evening_runs_its_stack(env, monkeypatch)
     assert report["pattern"] == "H" and report["cluster_label"] == "Front split"
     assert [i["exercise"] for i in report["stack"]["items"]] == [
         i.exercise for i in fsr.prescribe("H").live_items]
+    _log_plan_session(env, monkeypatch, MONDAY)      # the evening needs Monday trained
     plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
     assert plan["kind"] == "mobility" and plan["note"] == mob.NOTE
     assert [e["name"] for e in plan["exercises"]] == [
@@ -488,12 +494,17 @@ def test_after_the_front_split_test_the_evening_runs_its_stack(env, monkeypatch)
 
 def test_an_evening_done_before_a_move_is_not_offered_again(env, monkeypatch):
     """The athlete, 2026-11-11: "when I move the Friday training to Thursday
-    the evening mobility if not performed goes to Thursday". In week 1: the
-    evening session done on Tuesday, then Thursday's C moved to Wednesday.
-    Tuesday's tile still shows it done; Wednesday, now before Thursday's rest,
-    has none, because the week's other evening is Friday's."""
+    the evening mobility if not performed goes to Thursday". In week 1: A and B
+    trained, the evening session done on Tuesday, then Thursday's C moved to
+    Wednesday. Tuesday's tile still shows it done; Wednesday, now the second
+    of two training days before Thursday's rest, has none, because it is the
+    week's only evening and it is done. Friday's D stands alone after
+    Thursday's rest and has none (2026-11-18)."""
     thursday, friday = MONDAY + timedelta(days=3), MONDAY + timedelta(days=4)
+    _log_plan_session(env, monkeypatch, MONDAY)
+    _log_plan_session(env, monkeypatch, TUESDAY)
     plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
+    assert plan["kind"] == "mobility"
     first = plan["exercises"][0]
     env.ok(monkeypatch, "post", "/api/training/sessions", local=TUESDAY, body={
         "session_id": f"{TUESDAY}-mob00002", "date": TUESDAY.isoformat(), "kind": "mobility",
@@ -506,7 +517,7 @@ def test_an_evening_done_before_a_move_is_not_offered_again(env, monkeypatch):
     tuesday = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
     assert tuesday["kind"] == "mobility" and tuesday["done_today"]
     assert env.ok(monkeypatch, "get", "/api/training/daily", local=WEDNESDAY)["kind"] == "daily"
-    assert env.ok(monkeypatch, "get", "/api/training/daily", local=friday)["kind"] == "mobility"
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=friday)["kind"] == "daily"
 
 
 def test_a_session_moved_to_a_later_day_takes_the_evening_mobility_with_it(env, monkeypatch):
@@ -514,9 +525,12 @@ def test_a_session_moved_to_a_later_day_takes_the_evening_mobility_with_it(env, 
     tomorrow, the Friday becomes the rest day and mobility goes to tomorrow
     evening instead of tonight, and D training stays on Saturday morning ...
     It needs to be able to handle it." The same move in week 1: on Tuesday
-    (B, before Wednesday's rest), Thursday's C moves to Wednesday."""
+    (B, before Wednesday's rest, Monday trained), Thursday's C moves to
+    Wednesday. The evening goes to Wednesday, the second of two training days
+    before Thursday's rest; Friday's D, alone after it, has none (2026-11-18)."""
     from services import plan as ph
     thursday, friday = MONDAY + timedelta(days=3), MONDAY + timedelta(days=4)
+    _log_plan_session(env, monkeypatch, MONDAY)
     assert env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)["kind"] == "mobility"
     day = env.ok(monkeypatch, "get", f"/api/training/day?date={thursday}", local=TUESDAY)
     moves = {m["date"]: m for m in day["moves"]}
@@ -530,9 +544,10 @@ def test_a_session_moved_to_a_later_day_takes_the_evening_mobility_with_it(env, 
     assert [ph.day_number_in_phase(stored, MONDAY + timedelta(days=i)) for i in range(7)] == [
         1, 2, 4, 3, 5, 6, 7]
     assert env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)["kind"] == "daily"
+    _log_plan_session(env, monkeypatch, TUESDAY)
     assert env.ok(monkeypatch, "get", "/api/training/daily", local=WEDNESDAY)["kind"] == "mobility"
     assert env.ok(monkeypatch, "get", "/api/training/daily", local=thursday)["kind"] == "daily"
-    assert env.ok(monkeypatch, "get", "/api/training/daily", local=friday)["kind"] == "mobility"
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=friday)["kind"] == "daily"
 
 
 def test_a_move_to_a_past_day_or_into_the_next_week_stores_nothing(env, monkeypatch):
@@ -552,7 +567,9 @@ def test_a_saved_evening_session_is_done_counts_in_strain_and_leaves_the_strengt
     """Its own Type, an extra: the morning's strength session is still offered,
     the evening alone never makes a logged day, and it counts in strain."""
     from services import mobility_session as mob
+    _log_plan_session(env, monkeypatch, MONDAY)
     plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
+    assert plan["kind"] == "mobility"
     first = plan["exercises"][0]
     body = {"session_id": f"{TUESDAY}-mob00001", "date": TUESDAY.isoformat(), "kind": "mobility",
             "duration_minutes": 26, "session_rpe": 4, "exercises": [{

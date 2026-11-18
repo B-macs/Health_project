@@ -446,8 +446,16 @@ def daily_plan(repo, today: date) -> dict:
     monday = today - timedelta(days=today.weekday())
     done_on = [d for d in (monday + timedelta(days=i) for i in range(today.weekday()))
                if mob.done_today(dly.read_day_sessions(repo, d))]
-    if not r.phases_error and (mob.done_today(day_sessions)
-                               or mob.is_due(r.phases, today, done_on)):
+    # The days trained: the evening is on the second of two training days in a
+    # row (2026-11-18), and a day before today counts only when it was trained.
+    # A log that cannot be read gives the tendon session, which runs any day.
+    try:
+        trained_on = {date.fromisoformat(d) for d in repo.get_logged_session_dates(
+            monday - timedelta(days=1), today, include_supplementary=False)}
+    except Exception:
+        trained_on = None
+    if not r.phases_error and (mob.done_today(day_sessions) or (
+            trained_on is not None and mob.is_due(r.phases, today, done_on, trained_on))):
         # The front split stack for his latest front split test (2026-11-11);
         # before the first test, the last stack a test prescribed.
         pattern = mob.front_split_pattern(repo, today)

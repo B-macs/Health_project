@@ -4,6 +4,8 @@
 
 
 ## Now
+**2026-11-18, his question ("Why is every day now mobility training"):** the evening mobility rule never read the day before, so a missed day put the evening on the day after it until the week moved (Tue 10 and Wed 11 Nov; Tue 17 until 12:06 and Wed 18 Nov). His answers: the evening is on the second of two training days in a row (yesterday trained, today strength, tomorrow rest), and mobility still replaces the tendon session on it. `mobility_session.is_training_day`; engine only.
+
 **2026-11-11, his request to find the missed watch sessions on the Garmin server:** the match had searched Garmin's 20 newest activities, so the 35-day catch-up could never match an older session; it now searches the session's own day. `scripts/backfill_session_hr.py --from 2026-08-01 --shift 2026-08-06=2 --apply` stored 8 matches (6, 12, 14, 16, 18, 20, 24 Aug, 11 Nov) after an off-site backup, read back 8 of 8; 11 sessions have no Garmin activity, 5 Aug's walk is not the session.
 
 **2026-11-11, his question on the chest-strap session ("why didnt it take the data over at that stage ?"):** the watch check only looks for the activity; the heart-rate match was asked only after the save was confirmed and while the saved screen was open, and it stored nothing (display only, the row waited for the morning sync). The engine log holds one match in 30 days. His answer: "Yes fix that, and add in a turning ring ... I dont want the user the option to close until it is sent". The match is queued in the outbox behind the save, the engine stores a plan session's match at once, and the saved screen holds Done with a turning ring until both have reached the engine (a failed try, a refused save or 60 s gives it back). Phone app and engine.

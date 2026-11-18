@@ -8,9 +8,11 @@ training on those days." His answers the same day: "Two evenings, no Sunday"
 and "Follow the rule".
 
 What it pins:
-- the evening is due on a day whose scheduled plan day is a strength session
-  and whose next day's is not, read through date_overrides, so it moves when
-  the sessions move;
+- the evening is due on the second of two training days in a row with a rest
+  day after it (2026-11-18: "mobility only when there is a rest day the next
+  day after the two days of training"): yesterday trained (a logged plan
+  session), today a strength day, tomorrow rest, read through date_overrides,
+  so it moves when the sessions move; a strength day alone has none;
 - in a normal week that is Tuesday and Friday, never more than two a week (the
   blueprint's limit), and from week 4 no Sunday session;
 - the session is the Sunday stack, defined in goal_block.py, never here;
@@ -65,14 +67,15 @@ def test_never_more_than_two_evenings_a_week_and_no_sunday_session():
         assert flexibility_days == [] and 1 <= len(evenings) <= 2, n
 
 
-def test_the_evening_follows_the_sessions_when_they_move():
-    """"Follow the rule": the week of 2026-11-09 as it is stored, session D
-    moved onto Tuesday and the rest along: B on Wednesday, rest on Thursday, C
-    on Friday. The evenings are Wednesday and Friday, as he said."""
+def test_the_evening_follows_the_sessions_when_they_move_and_a_lone_day_has_none():
+    """"Follow the rule": session D moved onto Tuesday and the rest along: B
+    on Wednesday, rest on Thursday, C on Friday, rest on Saturday. Wednesday is
+    the second of two training days before a rest day; Friday's C stands alone
+    between two rest days and has no evening (2026-11-18)."""
     phases = _phases(**{"2026-11-10": 26, "2026-11-11": 23, "2026-11-12": 24,
                         "2026-11-13": 25})
     due = [d for d in _week(4) if mob.is_due(phases, d)]
-    assert due == [date(2026, 11, 11), date(2026, 11, 13)]
+    assert due == [date(2026, 11, 11)]
 
 
 # ─── A move never adds an evening (the athlete, 2026-11-11) ─────────────────
@@ -84,22 +87,65 @@ _C_ON_THURSDAY = {"2026-11-10": 23, "2026-11-11": 23, "2026-11-12": 25, "2026-11
 WED, THU, SAT = date(2026, 11, 11), date(2026, 11, 12), date(2026, 11, 14)
 
 
-def test_a_moved_evening_not_yet_done_goes_to_the_new_day():
+MON4 = date(2026, 11, 9)
+
+
+def test_a_moved_session_takes_the_evening_to_the_new_second_day():
     """"when I move the Friday training to Thursday the evening mobility if
-    not performed goes to Thursday": Wednesday's evening not done, Thursday
-    and Saturday both have one."""
+    not performed goes to Thursday": Monday's A trained, Tuesday missed, B on
+    Wednesday, C moved to Thursday, rest on Friday. Wednesday's B follows a
+    missed day and has none; Thursday is the second of two training days
+    before a rest day; Saturday's D stands alone after Friday's rest."""
     phases = _phases(**_C_ON_THURSDAY)
-    assert [d for d in _week(4) if mob.is_due(phases, d)] == [THU, SAT]
-    assert not mob.is_due(phases, WED), "Wednesday is no longer before a day off"
+    assert not mob.is_due(phases, WED, trained_on={MON4}), "Tuesday was not trained"
+    assert mob.is_due(phases, THU, trained_on={MON4, WED})
+    assert not mob.is_due(phases, SAT, trained_on={MON4, WED, THU}), "D alone after a rest day"
+
+
+#: Week 5 with Thursday's C moved to Wednesday: Monday A, Tuesday B, Wednesday C,
+#: Thursday rest, Friday D, Saturday and Sunday rest.
+_C_ON_WEDNESDAY = {"2026-11-18": 32, "2026-11-19": 31}
+MON5, TUE5, WED5 = date(2026, 11, 16), date(2026, 11, 17), date(2026, 11, 18)
 
 
 def test_a_moved_evening_already_done_is_not_owed_again():
-    """Wednesday's evening done, then C moved to Thursday: the week still owes
-    one evening, Saturday's; Thursday has none."""
-    phases = _phases(**_C_ON_THURSDAY)
-    assert not mob.is_due(phases, THU, done_on=[WED])
-    assert mob.is_due(phases, SAT, done_on=[WED])
-    assert not mob.is_due(phases, SAT, done_on=[WED, THU]), "both evenings done"
+    """A move never adds an evening: Tuesday's evening done, then Thursday's C
+    moved to Wednesday. Wednesday is now the second of two training days before
+    a rest day, the week's only evening, and it is already done; not done, it
+    has one."""
+    phases = _phases(**_C_ON_WEDNESDAY)
+    assert not mob.is_due(phases, WED5, done_on=[TUE5], trained_on={MON5, TUE5})
+    assert mob.is_due(phases, WED5, done_on=[], trained_on={MON5, TUE5})
+
+
+def test_a_missed_day_never_puts_the_evening_on_the_day_after_it():
+    """The week of 16 Nov, as he saw it: Monday's A missed. Before the week
+    moved, Tuesday held B with rest on Wednesday, and the tile read mobility on
+    Tuesday at 12:05; after the move (A Tuesday, B Wednesday, rest Thursday, C
+    Friday, D Saturday) it read mobility on Wednesday too. Now Tuesday has none
+    either way, and the evenings are Wednesday and Saturday."""
+    before = _phases()
+    assert not mob.is_due(before, TUE5, trained_on=set()), "Monday was not trained"
+    moved = _phases(**{"2026-11-17": 29, "2026-11-18": 30, "2026-11-19": 31,
+                       "2026-11-20": 32, "2026-11-21": 33, "2026-11-22": 34})
+    assert not mob.is_due(moved, TUE5, trained_on=set())
+    assert mob.is_due(moved, WED5, trained_on={TUE5})
+    assert not mob.is_due(moved, date(2026, 11, 20), trained_on={TUE5, WED5})
+    assert mob.is_due(moved, date(2026, 11, 21), trained_on={TUE5, WED5, date(2026, 11, 20)})
+
+
+def test_in_a_normal_week_the_evening_needs_yesterday_trained():
+    """Tuesday's evening needs Monday's session done, Friday's Thursday's.
+    Today counts by its plan: a strength day not yet trained still has its
+    evening."""
+    phases = _phases()
+    mon, tue, thu, fri = _week(5)[0], _week(5)[1], _week(5)[3], _week(5)[4]
+    assert mob.is_due(phases, tue, trained_on={mon})
+    assert not mob.is_due(phases, tue, trained_on=set())
+    assert mob.is_due(phases, fri, trained_on={mon, tue, thu})
+    assert not mob.is_due(phases, fri, trained_on={mon, tue})
+    assert mob.is_training_day(phases, tue, tue, set()), "today counts by its plan"
+    assert not mob.is_training_day(phases, mon, tue, set()), "a past day counts by the log"
 
 
 def test_a_done_evening_in_a_normal_week_leaves_the_second_one():
@@ -111,11 +157,12 @@ def test_a_done_evening_in_a_normal_week_leaves_the_second_one():
     assert mob.is_due(phases, friday, done_on=[_week(4)[4]])
 
 
-def test_a_forced_rest_has_no_evening_and_gives_one_to_the_day_before():
+def test_a_forced_rest_has_no_evening_and_a_strength_day_it_leaves_alone_has_none():
     phases = _phases(**{"2026-11-16": 0})              # Monday of week 5 forced rest
     assert not mob.is_due(phases, date(2026, 11, 16))
+    assert not mob.is_due(phases, date(2026, 11, 17)), "Tuesday's B follows a day off"
     phases = _phases(**{"2026-11-17": 0})              # Tuesday forced rest
-    assert mob.is_due(phases, date(2026, 11, 16)), "Monday is now before a day off"
+    assert not mob.is_due(phases, date(2026, 11, 16)), "Monday's A stands alone (2026-11-18)"
 
 
 def test_no_block_no_evening_and_the_blocks_last_strength_day_has_one():
