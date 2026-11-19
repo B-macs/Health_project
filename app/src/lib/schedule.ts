@@ -17,7 +17,7 @@ import { S } from '../strings'
 import { enqueue } from './outbox'
 import { ulid } from './ulid'
 
-export const SCHEDULE_KINDS = ['swap', 'carry', 'shift', 'redo', 'gate1'] as const
+export const SCHEDULE_KINDS = ['swap', 'carry', 'shift', 'redo', 'gate1', 'evening'] as const
 export type ScheduleKind = (typeof SCHEDULE_KINDS)[number]
 
 export function isSchedule(kind: string): kind is ScheduleKind {
@@ -25,7 +25,7 @@ export function isSchedule(kind: string): kind is ScheduleKind {
 }
 
 /** The kinds whose answer the engine applies once by its id. */
-const ONCE: readonly ScheduleKind[] = ['swap', 'carry', 'shift', 'redo']
+const ONCE: readonly ScheduleKind[] = ['swap', 'carry', 'shift', 'redo', 'evening']
 
 export async function sendAnswer(store: HealthDB, kind: ScheduleKind, path: string,
   body: Record<string, unknown> = {}): Promise<string> {
@@ -38,6 +38,10 @@ export const swapWithToday = (store: HealthDB, day: string) =>
 /** A day's session to a later day of the same week (2026-11-11): the two days trade. */
 export const moveToDay = (store: HealthDB, day: string, to: string) =>
   sendAnswer(store, 'swap', '/api/training/swap', { date: day, to })
+/** Two days trade their second-tile sessions, the evening mobility and the tendon session
+ *  (2026-11-19: "I should be able to swap with another day"). */
+export const swapEvening = (store: HealthDB, day: string, to: string) =>
+  sendAnswer(store, 'evening', '/api/training/daily/swap', { date: day, to })
 export const answerCarry = (store: HealthDB, accept: boolean) =>
   sendAnswer(store, 'carry', '/api/training/carry', { accept })
 export const answerShift = (store: HealthDB, accept: boolean) =>

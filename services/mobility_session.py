@@ -46,10 +46,20 @@ strength day done. It still counts in strain and the load ratio.
 
 NEVER A LOCK: on the evenings it is due the tile offers it in place of the daily
 tendon session; when to do it is the athlete's decision.
+
+A DAY'S SESSION CAN BE SWAPPED WITH ANOTHER DAY'S (the athlete, 2026-11-19: "If
+for what ever reason I dont want to do Evening mobility today or if I dont want
+to do daily tendon, I should be able to swap with another day"). A swap trades
+the second-tile sessions of two days of the same week, today or later
+(training_session.swap_evening); the swaps are kept in config (SWAPS_KEY) as
+pairs of days and applied over the rule's own answer (apply_swaps), so the week
+still holds the same evenings, only on other days, and a later move of the
+sessions trades whatever the two days then hold.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import date, timedelta
 
 import goal_block as gb
@@ -173,3 +183,49 @@ def is_due(phases, today: date, done_on=(), trained_on=None, asked_on: date | No
 def done_today(day_sessions: list[dict]) -> bool:
     """An evening mobility session is logged today."""
     return any(s.get("type") == MOBILITY_TYPE for s in day_sessions)
+
+
+# ─── Swaps between two days (2026-11-19) ─────────────────────────────────────
+
+#: The config row of the swaps, in the order made: [{"a": "YYYY-MM-DD", "b": ...}].
+SWAPS_KEY = "evening_swaps"
+#: The newest swaps kept. Each one acts inside its own week, so a short list is plenty.
+SWAPS_KEPT = 60
+
+
+def _parse_swaps(raw) -> list[tuple[date, date]]:
+    try:
+        items = json.loads(raw) if raw else []
+    except ValueError:
+        return []
+    out = []
+    for item in items if isinstance(items, list) else []:
+        try:
+            out.append((date.fromisoformat(item["a"]), date.fromisoformat(item["b"])))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
+
+
+def read_swaps(repo, live: bool = False) -> list[tuple[date, date]]:
+    """The stored swaps, oldest first. `live` reads the store itself (before a
+    write); the screen reads the local copy."""
+    raw = (repo.get_config_value_live if live else repo.get_config_value)(SWAPS_KEY)
+    return _parse_swaps(raw)
+
+
+def store_swap(repo, a: date, b: date, today: date) -> None:
+    swaps = read_swaps(repo, live=True) + [(a, b)]
+    repo.set_config(SWAPS_KEY, json.dumps(
+        [{"a": x.isoformat(), "b": y.isoformat()} for x, y in swaps[-SWAPS_KEPT:]]), today)
+
+
+def apply_swaps(kinds: dict, swaps) -> dict:
+    """`kinds` ({day: session}) with each swap's two days trading their
+    sessions, in the order the swaps were made. A swap with a day outside
+    `kinds` (another week) changes nothing."""
+    out = dict(kinds)
+    for a, b in swaps:
+        if a in out and b in out:
+            out[a], out[b] = out[b], out[a]
+    return out

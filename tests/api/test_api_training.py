@@ -514,6 +514,73 @@ def test_the_tile_follows_the_day_picked_in_the_strip(env, monkeypatch):
     assert no_date["kind"] == "mobility" and no_date["date"] == TUESDAY.isoformat()
 
 
+def _tile(env, monkeypatch, day, local):
+    return env.ok(monkeypatch, "get", f"/api/training/daily?date={day}", local=local)
+
+
+def test_tonights_evening_mobility_swaps_with_another_day_of_its_week(env, monkeypatch):
+    """The athlete, 2026-11-19: "If for what ever reason I dont want to do Evening
+    mobility today or if I dont want to do daily tendon, I should be able to swap
+    with another day". In week 1, asked on Tuesday with Monday trained: tonight's
+    evening session can swap with any later day of the week that holds the
+    tendon session; the swap trades the two; sent again by the outbox it is
+    applied once; a second swap puts them back."""
+    thursday, friday = MONDAY + timedelta(days=3), MONDAY + timedelta(days=4)
+    _log_plan_session(env, monkeypatch, MONDAY)
+    tuesday = _tile(env, monkeypatch, TUESDAY, TUESDAY)
+    assert tuesday["kind"] == "mobility"
+    assert [t["date"] for t in tuesday["swap_targets"]] == [
+        (MONDAY + timedelta(days=i)).isoformat() for i in (2, 3, 5, 6)], "Friday is an evening too"
+    assert {t["kind"] for t in tuesday["swap_targets"]} == {"daily"}
+    body = {"date": TUESDAY.isoformat(), "to": thursday.isoformat(), "action_id": "evening-swap-1"}
+    for _ in range(2):
+        assert env.ok(monkeypatch, "post", "/api/training/daily/swap", local=TUESDAY,
+                      body=body) == {"stored": True}
+    assert _tile(env, monkeypatch, TUESDAY, TUESDAY)["kind"] == "daily"
+    thu = _tile(env, monkeypatch, thursday, TUESDAY)
+    assert thu["kind"] == "mobility" and thu["exercises"][0]["name"] == gb.FLEX_STACK[0]["name"]
+    assert _tile(env, monkeypatch, friday, TUESDAY)["kind"] == "mobility", "the week keeps two"
+    env.ok(monkeypatch, "post", "/api/training/daily/swap", local=TUESDAY, body={
+        "date": thursday.isoformat(), "to": TUESDAY.isoformat(), "action_id": "evening-swap-2"})
+    assert _tile(env, monkeypatch, TUESDAY, TUESDAY)["kind"] == "mobility"
+    assert _tile(env, monkeypatch, thursday, TUESDAY)["kind"] == "daily"
+
+
+def test_todays_tendon_session_swaps_with_a_later_evening(env, monkeypatch):
+    """Asked on Monday: today's tendon session swaps with Tuesday's evening, so
+    the evening session runs tonight and Tuesday has the tendon session."""
+    assert _tile(env, monkeypatch, TUESDAY, MONDAY)["kind"] == "mobility"
+    env.ok(monkeypatch, "post", "/api/training/daily/swap", local=MONDAY, body={
+        "date": MONDAY.isoformat(), "to": TUESDAY.isoformat(), "action_id": "evening-swap-3"})
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=MONDAY)["kind"] == "mobility"
+    assert _tile(env, monkeypatch, TUESDAY, MONDAY)["kind"] == "daily"
+
+
+def test_an_evening_swap_is_refused_across_weeks_into_the_past_or_on_a_done_day(env, monkeypatch):
+    import daily_tendon as dt
+    thursday = MONDAY + timedelta(days=3)
+
+    def refused(body, local):
+        r = env.call(monkeypatch, "post", "/api/training/daily/swap", local=local, body=body)
+        assert r.status_code == 409, r.text
+        return r.json()["error"]
+
+    _log_plan_session(env, monkeypatch, MONDAY)
+    tue, wed = TUESDAY.isoformat(), WEDNESDAY.isoformat()
+    assert refused({"date": tue, "to": tue}, TUESDAY) == "evening_swap_same_day"
+    assert refused({"date": wed, "to": thursday.isoformat()}, TUESDAY) == "evening_swap_same_session"
+    assert refused({"date": tue, "to": (MONDAY + timedelta(days=8)).isoformat()},
+                   TUESDAY) == "evening_swap_week"
+    assert refused({"date": tue, "to": wed}, WEDNESDAY) == "evening_swap_past"
+    env.ok(monkeypatch, "post", "/api/training/sessions", local=TUESDAY, body={
+        "session_id": f"{TUESDAY}-dai20001", "date": tue, "kind": "daily",
+        "duration_minutes": 11, "session_rpe": 3, "exercises": [{
+            "exercise_id": "ex-daily-swap", "exercise": dt.entries()[0],
+            "sets": [{"set_num": 1, "reps": 1, "weight": 0, "tut": 30, "ts": f"{TUESDAY}T07:00:00"}]}]})
+    assert refused({"date": wed, "to": tue}, TUESDAY) == "evening_swap_done"
+    assert _tile(env, monkeypatch, TUESDAY, TUESDAY)["swap_targets"] == [], "done: nothing to swap"
+
+
 def test_an_evening_done_before_a_move_is_not_offered_again(env, monkeypatch):
     """The athlete, 2026-11-11: "when I move the Friday training to Thursday
     the evening mobility if not performed goes to Thursday". In week 1: A and B

@@ -291,6 +291,19 @@ class TrainingDayOut(BaseModel):
 ActionId = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
 
 
+class DailySwapTarget(BaseModel):
+    date: date
+    #: daily or mobility: what that day holds now.
+    kind: str
+
+
+class DailySwapIn(BaseModel):
+    #: The day whose second-tile session swaps, and the day it swaps with.
+    date: date
+    to: date
+    action_id: ActionId | None = None
+
+
 class SwapIn(BaseModel):
     #: The other day: its session comes to today, and today's goes there.
     date: date
@@ -544,6 +557,9 @@ class SessionPlanOut(BaseModel):
     #: evening mobility session: whether one of its kind is already logged today.
     reminder: DailyReminder | None = None
     done_today: bool = False
+    #: The daily and the evening mobility session (2026-11-19): the days this
+    #: day's session can swap with (training_session.swap_evening).
+    swap_targets: list[DailySwapTarget] = []
 
 
 class CompletionIn(BaseModel):

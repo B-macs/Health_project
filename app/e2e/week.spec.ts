@@ -181,6 +181,29 @@ test('the second tile follows the day picked in the strip: tonight is mobility, 
   await expect(page.getByTestId('week-page')).toBeVisible()
 })
 
+test('tonight\'s evening mobility swaps with another day: the answer goes out once and today becomes the tendon session', async ({ page, context }) => {
+  await onboard(page)
+  await scenario(context, `e2e-evening-swap-${Date.now()}`, 'mobility_today')
+  await openTab(page, S.nav.training)
+  const tile = page.getByTestId('tile-daily')
+  await expect(tile).toContainText(S.daily.mobilityTitle)
+  await tile.click()
+  await page.getByTestId('daily-swap').click()
+  const days = page.getByTestId('daily-swap-days')
+  await expect(days).toContainText(S.daily.swapIntro(S.daily.mobilityTitle))
+  const first = days.getByRole('button').first()
+  await expect(first).toContainText(S.daily.dailyTitle)
+  const to = (await first.getAttribute('data-testid'))!.replace('daily-swap-', '')
+  const before = (await received(page)).length
+  await first.click()
+  await expect(page.getByTestId('week-page')).toBeVisible()
+  await expect(tile).toContainText(S.daily.dailyTitle, { timeout: 15_000 })
+  const sent = (await received(page)).slice(before).filter((r) => r.path === '/api/training/daily/swap')
+  expect(sent).toHaveLength(1)
+  expect(sent[0].body).toMatchObject({ to })
+  expect(await outboxLength(page)).toBe(0)
+})
+
 test('the Training tab opens on the week page: the week dates first, then the two tiles side by side; the daily tendon session runs its slow start and saves as its own kind (WP-40)', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-daily-${Date.now()}`)

@@ -665,6 +665,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/training/daily/swap": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Daily Swap
+         * @description Swap two days' second-tile sessions, the evening mobility and the daily
+         *     tendon session (2026-11-19), in the same week, from today on.
+         */
+        post: operations["post_daily_swap_api_training_daily_swap_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/training/day": {
         parameters: {
             query?: never;
@@ -1322,6 +1343,31 @@ export interface components {
             kind: "after" | "before";
             /** Time */
             time?: string | null;
+        };
+        /** DailySwapIn */
+        DailySwapIn: {
+            /** Action Id */
+            action_id?: string | null;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * To
+             * Format: date
+             */
+            to: string;
+        };
+        /** DailySwapTarget */
+        DailySwapTarget: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Kind */
+            kind: string;
         };
         /**
          * DataCheckOut
@@ -3156,6 +3202,11 @@ export interface components {
             rpe_target: number | null;
             /** Steps */
             steps: components["schemas"]["FlowStep"][];
+            /**
+             * Swap Targets
+             * @default []
+             */
+            swap_targets: components["schemas"]["DailySwapTarget"][];
         };
         /**
          * SessionReading
@@ -5768,6 +5819,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_daily_swap_api_training_daily_swap_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DailySwapIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredOut"];
                 };
             };
             /** @description Validation Error */

@@ -442,28 +442,18 @@ def daily_plan(repo, today: date, day: date | None = None) -> dict:
     ANOTHER DAY (2026-11-18: "When I select each day today every one of them is
     mobility ? Tomorrow should be tendon?"): the week page's tile follows the
     day picked in the strip. A day ahead is read as the plan stands today, a day
-    before today as the log has it (mobility_session.is_due's `asked_on`)."""
+    before today as the log has it (mobility_session.is_due's `asked_on`).
+
+    SWAPS (2026-11-19): the athlete's swaps between two days apply over the
+    rule's answer (mobility_session.apply_swaps); `swap_targets` lists the days
+    the day's session can swap with (swap_evening)."""
     d = day or today
     r = ts.read(repo, today)
     decided = ts.todays_decision(repo, r.phases, today)
-    day_sessions = dly.read_day_sessions(repo, d)
-    # An evening done that day stays on the tile, done, even when a move later
-    # takes its evening away; an evening done earlier that week is not owed
-    # again (mobility_session.is_due, 2026-11-11).
-    monday = d - timedelta(days=d.weekday())
-    done_on = [x for x in (monday + timedelta(days=i) for i in range(d.weekday()))
-               if x <= today and mob.done_today(dly.read_day_sessions(repo, x))]
-    # The days trained: the evening is on the second of two training days in a
-    # row (2026-11-18), and a day before today counts only when it was trained.
-    # A log that cannot be read gives the tendon session, which runs any day.
-    try:
-        trained_on = {date.fromisoformat(x) for x in repo.get_logged_session_dates(
-            min(monday, today) - timedelta(days=1), today, include_supplementary=False)}
-    except Exception:
-        trained_on = None
-    if not r.phases_error and (mob.done_today(day_sessions) or (
-            trained_on is not None
-            and mob.is_due(r.phases, d, done_on, trained_on, asked_on=today))):
+    week = _tile_week(repo, r, today, d)
+    day_sessions = week["sessions"][d]
+    targets = _swap_targets(week, today, d)
+    if week["kinds"][d] == MOBILITY:
         # The front split stack for his latest front split test (2026-11-11);
         # before the first test, the last stack a test prescribed.
         pattern = mob.front_split_pattern(repo, today)
@@ -473,6 +463,7 @@ def daily_plan(repo, today: date, day: date | None = None) -> dict:
         out["note"] = mob.note(pattern)
         out["reminder"] = None
         out["done_today"] = mob.done_today(day_sessions)
+        out["swap_targets"] = targets
         return out
     out = compose(repo, d, kind=DAILY, day_num=None, content=dly.build_day(), decided=decided)
     out["next_day"] = None
@@ -480,7 +471,87 @@ def daily_plan(repo, today: date, day: date | None = None) -> dict:
     out["reminder"] = (dly.reminder(day_sessions, _plan_still_to_do(repo, r, today))
                        if d == today else None)
     out["done_today"] = dly.done_today(day_sessions)
+    out["swap_targets"] = targets
     return out
+
+
+def _tile_week(repo, r, today: date, d: date) -> dict:
+    """The second tile's session on each day of `d`'s week, as asked on
+    `today`: {"kinds": {day: daily | mobility}, "mobility_done", "daily_done",
+    "sessions"}. The rule decides each day (mobility_session.is_due), the
+    athlete's swaps move it (apply_swaps), and an evening session logged on a
+    day keeps that day an evening, whatever a move or a swap did later."""
+    monday = d - timedelta(days=d.weekday())
+    days = [monday + timedelta(days=i) for i in range(7)]
+    sessions = {x: dly.read_day_sessions(repo, x) if x <= today else [] for x in days}
+    mobility_done = {x for x in days if mob.done_today(sessions[x])}
+    daily_done = {x for x in days if dly.done_today(sessions[x])}
+    # The days trained: the evening is on the second of two training days in a
+    # row (2026-11-18), and a day before today counts only when it was trained.
+    # A log that cannot be read gives the tendon session, which runs any day.
+    try:
+        trained_on = {date.fromisoformat(x) for x in repo.get_logged_session_dates(
+            min(monday, today) - timedelta(days=1), today, include_supplementary=False)}
+    except Exception:
+        trained_on = None
+    base = {}
+    for x in days:
+        # An evening done earlier that week is not owed again (2026-11-11).
+        due = (not r.phases_error and trained_on is not None and mob.is_due(
+            r.phases, x, [y for y in mobility_done if y < x], trained_on, asked_on=today))
+        base[x] = MOBILITY if (x in mobility_done or due) else DAILY
+    try:
+        swaps = mob.read_swaps(repo)
+    except Exception:
+        swaps = []
+    kinds = mob.apply_swaps(base, swaps)
+    kinds = {x: (MOBILITY if x in mobility_done else k) for x, k in kinds.items()}
+    return {"kinds": kinds, "mobility_done": mobility_done, "daily_done": daily_done,
+            "sessions": sessions}
+
+
+def _swap_targets(week: dict, today: date, d: date) -> list[dict]:
+    """The days `d`'s session can swap with: the other days of its week from
+    today on that hold the other session, neither day's session done."""
+    done = week["mobility_done"] | week["daily_done"]
+    if d < today or d in done:
+        return []
+    kinds = week["kinds"]
+    return [{"date": x, "kind": kinds[x]} for x in sorted(kinds)
+            if x >= today and x != d and x not in done and kinds[x] != kinds[d]]
+
+
+#: One swap at a time: each reads the stored swaps and writes them back.
+_EVENING_SWAP_LOCK = threading.Lock()
+
+
+def swap_evening(repo, today: date, day: date, to: date) -> dict:
+    """Swap two days' second-tile sessions (the athlete, 2026-11-19: "If for
+    what ever reason I dont want to do Evening mobility today or if I dont want
+    to do daily tendon, I should be able to swap with another day"): `day`
+    gets what `to` holds and `to` gets what `day` holds. Both days in the same
+    week (the week owes its evenings, mobility_session.is_due), neither before
+    today, holding different sessions, neither one done. Refused with
+    training_screen.ActionRefused otherwise; stored with mobility_session.
+    store_swap."""
+    if day == to:
+        raise ts.ActionRefused("evening_swap_same_day")
+    if min(day, to) < today:
+        raise ts.ActionRefused("evening_swap_past")
+    if day - timedelta(days=day.weekday()) != to - timedelta(days=to.weekday()):
+        raise ts.ActionRefused("evening_swap_week")
+    with _EVENING_SWAP_LOCK:
+        r = ts.read(repo, today)
+        if r.phases_error:
+            raise ts.ActionRefused("phases_unreadable")
+        week = _tile_week(repo, r, today, day)
+        done = week["mobility_done"] | week["daily_done"]
+        if day in done or to in done:
+            raise ts.ActionRefused("evening_swap_done")
+        if week["kinds"][day] == week["kinds"][to]:
+            raise ts.ActionRefused("evening_swap_same_session")
+        mob.store_swap(repo, day, to, today)
+    return {"stored": True}
 
 
 def egym_plan(repo, today: date) -> dict:

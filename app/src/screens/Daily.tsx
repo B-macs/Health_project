@@ -20,6 +20,9 @@
 // - The day picked in the strip (2026-11-18: "When I select each day today every one of them
 //   is mobility ? Tomorrow should be tendon?"): the second tile asks the engine for that day
 //   (?date=), and opens that day's session to read; Start is offered on the day itself only.
+// - Swap with another day (2026-11-19: "If for what ever reason I dont want to do Evening
+//   mobility today or if I dont want to do daily tendon, I should be able to swap with another
+//   day"): the days the engine allows (swap_targets), and the answer through the outbox.
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import type { components } from '../generated/api'
@@ -27,13 +30,16 @@ import { KEYS } from '../db/schema'
 import { localDay } from '../lib/api'
 import { useApp } from '../lib/appState'
 import { useCached } from '../lib/cache'
+import { swapEvening, useScheduleAnswers } from '../lib/schedule'
 import { startSession } from '../lib/session'
 import { newExerciseIds, newSessionId, startSessionState, type Plan } from '../lib/training'
 import { S } from '../strings'
 import { Freshness } from '../ui/Freshness'
+import { Sheet } from '../ui/Sheet'
 import { Timeline } from '../ui/timeline'
 import { Head } from './Extras'
 import { longDate, trainedToday } from './TrainingTab'
+import { waiting } from './Week'
 
 type Schemas = components['schemas']
 type DayPlan = Schemas['TrainingDayOut']
@@ -119,6 +125,14 @@ export function DailyOverview({ day }: { day?: string } = {}) {
   const plan = view.data && view.data.date === wanted
     && (view.data.kind === 'daily' || view.data.kind === 'mobility') ? view.data : null
   const mobility = plan?.kind === 'mobility'
+  // The days this session can swap with, from the engine; none while a swap waits to be sent.
+  const answers = useScheduleAnswers(store)
+  const [swapping, setSwapping] = useState(false)
+  const targets = plan && !plan.done_today && !waiting(answers, 'evening') ? plan.swap_targets ?? [] : []
+  const swapTo = (to: string) => {
+    setSwapping(false)
+    void swapEvening(store, wanted, to).then(() => go('/training'))
+  }
   const start = async () => {
     if (!plan || starting || other) return
     setStarting(true)
@@ -170,6 +184,24 @@ export function DailyOverview({ day }: { day?: string } = {}) {
                 onClick={() => void start()}>{plan.done_today ? S.daily.again : S.daily.start}</button>
             )}
           </div>
+          {targets.length > 0 && (
+            <button className="btn btn--glass btn--wide" data-testid="daily-swap" onClick={() => setSwapping(true)}>
+              {S.daily.swap}
+            </button>
+          )}
+          {swapping && (
+            <Sheet title={S.daily.swap} closeLabel={S.daily.cancel} onClose={() => setSwapping(false)}>
+              <div className="group" data-testid="daily-swap-days">
+                <p className="caption">{S.daily.swapIntro(secondTileTitle(plan))}</p>
+                {targets.map((t) => (
+                  <button key={t.date} className="btn btn--glass btn--wide" data-testid={`daily-swap-${t.date}`}
+                    onClick={() => swapTo(t.date)}>
+                    {S.daily.swapTo(longDate(t.date), t.kind === 'mobility' ? S.daily.mobilityTitle : S.daily.dailyTitle)}
+                  </button>
+                ))}
+              </div>
+            </Sheet>
+          )}
         </>
       )}
     </div>

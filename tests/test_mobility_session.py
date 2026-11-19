@@ -208,6 +208,25 @@ def test_its_type_is_its_own_an_extra_and_never_a_logged_day():
     assert mob.MOBILITY_TYPE in Repository.NOT_A_TRAINING_DAY_TYPES
 
 
+def test_a_swap_trades_two_days_sessions_in_the_order_made():
+    """2026-11-19: "I should be able to swap with another day". Each swap trades
+    the two days' sessions; a later swap acts on the result; a swap with a day
+    of another week changes nothing."""
+    tue, wed, thu, fri = _week(5)[1:5]
+    kinds = {tue: "mobility", wed: "daily", thu: "daily", fri: "mobility"}
+    assert mob.apply_swaps(kinds, [(tue, thu)]) == {
+        tue: "daily", wed: "daily", thu: "mobility", fri: "mobility"}
+    assert mob.apply_swaps(kinds, [(tue, thu), (thu, wed)])[wed] == "mobility"
+    assert mob.apply_swaps(kinds, [(tue, thu), (tue, thu)]) == kinds, "a swap back"
+    assert mob.apply_swaps(kinds, [(tue, _week(6)[0])]) == kinds
+
+
+def test_stored_swaps_that_cannot_be_read_are_left_out():
+    assert mob._parse_swaps(None) == [] and mob._parse_swaps("not json") == []
+    assert mob._parse_swaps('[{"a": "2026-11-18", "b": "2026-11-20"}, {"a": "x"}, 3]') == [
+        (date(2026, 11, 18), date(2026, 11, 20))]
+
+
 def test_done_today_reads_its_own_type():
     assert mob.done_today([{"session_id": "s", "type": mob.MOBILITY_TYPE, "last_set_ts": None}])
     assert not mob.done_today([{"session_id": "s", "type": "Daily", "last_set_ts": None}])

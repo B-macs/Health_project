@@ -10,7 +10,7 @@ import { S } from '../strings'
 import { ANSWERS_KEPT, answerOf, drain, enqueue } from './outbox'
 import {
   answerCarry, answerShift, clearRefused, gate1Flare, gate1Reason, isSchedule, moveToDay, redoWeek, refusalText,
-  swapWithToday,
+  swapEvening, swapWithToday,
 } from './schedule'
 import { ULID } from './ulid'
 
@@ -20,6 +20,21 @@ const store = () => new HealthDB(`schedule-test-${++n}-${Date.now()}`)
 const bodies = async (db: HealthDB) => (await db.outbox.orderBy('seq').toArray()).map((r) => [r.kind, r.path, r.body])
 
 describe('the answers', () => {
+  it('an evening swap (2026-11-19) carries its id and both days, and its refusals have words', async () => {
+    const db = store()
+    await swapEvening(db, '2026-11-19', '2026-11-21')
+    const [row] = await db.outbox.toArray()
+    expect([row.kind, row.path]).toEqual(['evening', '/api/training/daily/swap'])
+    expect(row.body).toMatchObject({ date: '2026-11-19', to: '2026-11-21' })
+    expect((row.body as { action_id: string }).action_id).toMatch(ULID)
+    expect(isSchedule('evening')).toBe(true)
+    for (const code of ['evening_swap_same_day', 'evening_swap_same_session', 'evening_swap_week',
+      'evening_swap_past', 'evening_swap_done']) {
+      const text = refusalText({ ...row, state: 'failed', last_error: code })
+      expect(text).toBe(S.week.refused(S.week.answerName.evening, S.week.refusedWhy[code], ''))
+    }
+  })
+
   it('a move carries an id minted for the answer; each answer its own', async () => {
     const db = store()
     await swapWithToday(db, '2026-10-22')

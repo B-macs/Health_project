@@ -280,7 +280,7 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
       return send(200, fx.accessoryPlan(scenarioOf(req).has('accessory_yesterday') ? fx.addDays(local, -1) : local))
     }
     if (url.pathname === '/api/training/daily') {
-      return send(200, fx.dailyPlan(local, scenarioOf(req), url.searchParams.get('date')))
+      return send(200, fx.dailyPlan(local, scenarioOf(req), url.searchParams.get('date'), runOf(req).eveningSwaps))
     }
     if (url.pathname === '/api/training/egym') return send(200, fx.egymPlan(local))
     if (url.pathname === '/api/training/yoga') return send(200, fx.yogaCatalogue())
@@ -391,6 +391,16 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
         const [status, payload] = answerSchedule(url.pathname, body as Record<string, unknown> | null, runOf(req), scenarioOf(req))
         if (status === 200 && cookie(req, 'e2e_lose_answer') === '1') return send(503, { error: 'engine_unavailable' })
         return send(status, payload)
+      }
+      if (url.pathname === '/api/training/daily/swap' && req.method === 'POST') {
+        // The evening swap (2026-11-19): applied once per id, as the engine applies it.
+        const b = body as { date: string; to: string; action_id?: string }
+        const run = runOf(req)
+        if (!b.action_id || !run.applied.includes(b.action_id)) {
+          run.eveningSwaps.push([b.date, b.to])
+          if (b.action_id) run.applied.push(b.action_id)
+        }
+        return send(200, { stored: true })
       }
       if (url.pathname === '/api/training/yoga' && req.method === 'POST') {
         const b = body as { slug: string; session_id: string }

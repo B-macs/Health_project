@@ -319,11 +319,13 @@ export interface WeekRun {
   flexFinished: boolean
   /** The engine's sync (Phase 9): when the phone ran it in this run (null: not yet). */
   syncedAt: string | null
+  /** The evening swaps of this run (2026-11-19), in the order made. */
+  eveningSwaps: [string, string][]
 }
 
 export const newRun = (): WeekRun => ({
   applied: [], swaps: [], carry: false, shift: false, redo: false, flare: false, reasons: {}, yoga: {},
-  outdoor: {}, flexStep: null, flexFinished: false, syncedAt: null,
+  outdoor: {}, flexStep: null, flexFinished: false, syncedAt: null, eveningSwaps: [],
 })
 
 const BANNER: Schemas['WeekBanner'] = {
@@ -416,14 +418,27 @@ export function accessoryPlan(local: string) {
 /** The daily tendon session (WP-40, dev/daily_fixture.json, made by the engine's walk).
  *  `daily_before`: today's gym session is still to come; `daily_rest`: no reminder line;
  *  `daily_done`: a daily session is already logged today. */
-export function dailyPlan(local: string, scenario: Set<string>, asked: string | null = null) {
+export function dailyPlan(local: string, scenario: Set<string>, asked: string | null = null,
+  swaps: [string, string][] = []) {
   const day = asked ?? local
   // `mobility_today` (2026-11-18): today's evening is the mobility session, every other day
-  // the tendon session, as the engine answers for the day picked in the strip.
-  const kind = scenario.has('mobility_today') && day === local ? 'mobility' : daily.kind
+  // the tendon session, as the engine answers for the day picked in the strip. This run's
+  // swaps (2026-11-19) trade two days' sessions, as the engine's do.
+  const week = [0, 1, 2].map((i) => shiftIso(local, i))
+  const kinds: Record<string, string> = Object.fromEntries(week.map((d) => [d,
+    scenario.has('mobility_today') && d === local ? 'mobility' : daily.kind]))
+  for (const [a, b] of swaps) if (a in kinds && b in kinds) [kinds[a], kinds[b]] = [kinds[b], kinds[a]]
+  const kind = kinds[day] ?? daily.kind
+  const done = day === local && scenario.has('daily_done')
   const reminder = day !== local || kind === 'mobility' || scenario.has('daily_rest') ? null
     : scenario.has('daily_before') ? { kind: 'before' as const, time: null } : daily.reminder
-  return { ...daily, kind, date: day, reminder, done_today: day === local && scenario.has('daily_done') }
+  const swap_targets = done || day < local ? []
+    : week.filter((d) => d !== day && kinds[d] !== kind).map((d) => ({ date: d, kind: kinds[d] }))
+  return { ...daily, kind, date: day, reminder, done_today: done, swap_targets }
+}
+
+function shiftIso(iso: string, days: number): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
 }
 
 /** The EGYM circuit (2026-11-08, dev/egym_fixture.json, made by the engine's walk). */

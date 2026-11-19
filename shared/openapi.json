@@ -977,6 +977,59 @@
         "title": "DailyReminder",
         "type": "object"
       },
+      "DailySwapIn": {
+        "properties": {
+          "action_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Id"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "to": {
+            "format": "date",
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "to"
+        ],
+        "title": "DailySwapIn",
+        "type": "object"
+      },
+      "DailySwapTarget": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "kind"
+        ],
+        "title": "DailySwapTarget",
+        "type": "object"
+      },
       "DataCheckOut": {
         "description": "The daily data check (services/data_check.py): the rows of the newest\nbackup that the store no longer holds. Reads only.",
         "properties": {
@@ -6412,6 +6465,14 @@
               "$ref": "#/components/schemas/FlowStep"
             },
             "title": "Steps",
+            "type": "array"
+          },
+          "swap_targets": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DailySwapTarget"
+            },
+            "title": "Swap Targets",
             "type": "array"
           }
         },
@@ -12966,6 +13027,79 @@
           }
         },
         "summary": "Get Daily"
+      }
+    },
+    "/api/training/daily/swap": {
+      "post": {
+        "description": "Swap two days' second-tile sessions, the evening mobility and the daily\ntendon session (2026-11-19), in the same week, from today on.",
+        "operationId": "post_daily_swap_api_training_daily_swap_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DailySwapIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Daily Swap"
       }
     },
     "/api/training/day": {

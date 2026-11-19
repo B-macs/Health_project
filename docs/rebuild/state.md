@@ -4,6 +4,8 @@
 
 
 ## Now
+**2026-11-19, his request ("I should be able to swap with another day"):** the second tile's session page offers "Swap with another day" for the evening mobility or the tendon session: two days of the same week, from today on, trade their sessions (`POST /api/training/daily/swap`, stored in config `evening_swaps`, applied once by its id). Engine and phone app.
+
 **2026-11-18, his question ("When I select each day today every one of them is mobility ?"):** both tiles read today's answers, so the second tile showed tonight's mobility on every picked day. `GET /api/training/daily?date=` answers for a day; the phone's tile asks for the picked day and opens that day's session to read (`/training/daily/<date>`, no Start). Engine and phone app.
 
 **2026-11-18, his question ("Why is every day now mobility training"):** the evening mobility rule never read the day before, so a missed day put the evening on the day after it until the week moved (Tue 10 and Wed 11 Nov; Tue 17 until 12:06 and Wed 18 Nov). His answers: the evening is on the second of two training days in a row (yesterday trained, today strength, tomorrow rest), and mobility still replaces the tendon session on it. `mobility_session.is_training_day`; engine only.

@@ -24,7 +24,7 @@ from services.background_sync import BackgroundSyncRunner, SyncBusyError
 from services.repository import Repository
 
 from ..deps import get_repository, get_sync_runner, local_today
-from ..schemas_training import (ActivityMinutesOut, AnswerIn, CompletionIn, CompletionOut,
+from ..schemas_training import (ActivityMinutesOut, AnswerIn, CompletionIn, CompletionOut, DailySwapIn,
                                 EquipmentIn, EquipmentOut, ReplacementIn, ReplacementOut,
                                 FlexCheckIn, FlexCheckOut, RedoIn, Gate1ReasonIn, HeartRateIn, HeartRateOut, LoggedOut,
                                 OpenActivityOut, OutdoorListOut, OutdoorLogIn, OutdoorLogOut,
@@ -94,6 +94,15 @@ def post_swap(body: SwapIn, today: date = Depends(local_today),
     same week (2026-11-11); the day left behind gets what the target held."""
     return _action(lambda: ts.once(repo, body.action_id, today,
                                    lambda: ts.swap_with_today(repo, today, body.date, body.to)))
+
+
+@router.post("/api/training/daily/swap", response_model=StoredOut)
+def post_daily_swap(body: DailySwapIn, today: date = Depends(local_today),
+                    repo: Repository = Depends(get_repository)) -> dict:
+    """Swap two days' second-tile sessions, the evening mobility and the daily
+    tendon session (2026-11-19), in the same week, from today on."""
+    return _action(lambda: ts.once(repo, body.action_id, today,
+                                   lambda: tsession.swap_evening(repo, today, body.date, body.to)))
 
 
 @router.post("/api/training/carry", response_model=StoredOut)

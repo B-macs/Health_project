@@ -373,6 +373,11 @@ export const S = {
     doneToday: 'Done today',
     // Another day picked in the week strip (2026-11-18): that day's session, to read.
     doneThatDay: 'Done that day',
+    // A day's session swapped with another day's (2026-11-19).
+    swap: 'Swap with another day',
+    swapIntro: (title: string) =>
+      `${title} goes to the day you pick, and that day's session comes here.`,
+    swapTo: (day: string, holds: string) => `${day} · now ${holds}`,
     otherDay: (date: string) => `The session for ${date}. You can start it on the day itself.`,
     rounds: (n: number, minutes: number) => `3 rounds · ${n} entries · about ${minutes} min`,
     gelatin: 'Gelatin: about 15 g with about 200 mg vitamin C, 30–60 minutes before.',
@@ -430,7 +435,7 @@ export const S = {
     startHeld: 'Today’s session is read again once your answer is sent: Start waits for it.',
     answerName: {
       swap: 'The swap', carry: 'The reschedule', shift: 'The readiness move', redo: 'The redo',
-      gate1: 'The gate 1 answer', other: 'The answer',
+      gate1: 'The gate 1 answer', evening: 'The evening swap', other: 'The answer',
     } as Record<string, string>,
     refused: (what: string, why: string, detail: string) =>
       `${what} was not saved${why ? `: ${why}` : ''}${detail ? ` (${detail})` : ''}.`,
@@ -444,6 +449,11 @@ export const S = {
       no_active_block: 'no block covers today',
       gate1_not_running: 'gate 1 does not run in this block',
       unknown_reason: 'the engine does not know that answer',
+      evening_swap_same_day: 'a day cannot swap with itself',
+      evening_swap_same_session: 'both days have the same session',
+      evening_swap_week: 'both days must be in the same week',
+      evening_swap_past: 'a day before today cannot swap',
+      evening_swap_done: 'one of the two sessions is already done',
     } as Record<string, string>,
     clear: 'OK',
     gate1Ask: (week: string, done: number, required: number, weeks: number) =>
