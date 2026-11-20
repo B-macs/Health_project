@@ -15,6 +15,7 @@ import type { BrowserContext, Page } from '@playwright/test'
 import { localDay } from '../src/lib/api'
 import { S } from '../src/strings'
 import { longDate } from '../src/lib/dates'
+import { addDays } from '../dev/fixtures'
 import { expect, leaveSession, onboard, openTab, ORIGIN, startTraining, tapToSave, test, openTraining } from './helpers'
 
 type Received = { method: string; path: string; body: Record<string, unknown> }
@@ -171,10 +172,16 @@ test('the second tile follows the day picked in the strip: tonight is mobility, 
   await openTab(page, S.nav.training)
   const tile = page.getByTestId('tile-daily')
   await expect(tile).toContainText(S.daily.mobilityTitle)
-  await strip(page).locator('[data-marker="planned"]').first().click()
+  // Tomorrow by its date, on any day of the week: the made-up week trains Monday, Tuesday,
+  // Thursday and Friday, so from Friday to Sunday no later day of this week is a planned
+  // one (the test picked the first planned day and failed on those three days). On a Sunday
+  // tomorrow is in the week after this one.
+  const tomorrow = addDays(localDay(), 1)
+  if (await strip(page).locator(`[data-date="${tomorrow}"]`).count() === 0) await weekStep(page, 1)
+  await strip(page).locator(`[data-date="${tomorrow}"]`).click()
   await expect(tile).toContainText(S.daily.dailyTitle)
   await tile.click()
-  await expect(page.getByTestId('daily-other-day')).toBeVisible()
+  await expect(page.getByTestId('daily-other-day')).toContainText(longDate(tomorrow))
   await expect(page.getByTestId('daily')).toContainText(S.daily.dailyTitle)
   await expect(page.getByTestId('daily-start')).toHaveCount(0)
   await page.getByRole('button', { name: S.daily.cancel }).click()
