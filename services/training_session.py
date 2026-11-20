@@ -108,7 +108,7 @@ def timer_kind(ex: dict) -> str | None:
 EXERCISE_FIELDS = ("name", "type", "laterality", "sets", "reps", "reps_in_set", "hold_seconds",
                    "duration_minutes", "rest_seconds", "tempo", "rep_min", "rep_max",
                    "equipment_type", "increment_size", "increment_unit", "weight_kg",
-                   "band_tier", "lead_in_seconds")
+                   "band_tier", "lead_in_seconds", "fine_step", "effort")
 
 
 def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tuple,

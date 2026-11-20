@@ -2,7 +2,7 @@
 // Contrast is WCAG 2's: 4.5 for text, 3 for large numbers and graphics; a glass colour
 // is laid over the page colour before it is measured.
 import { describe, expect, it } from 'vitest'
-import { DESIGN, FAMILIES, NEUTRALS, PAGE_FAMILY, type FamilyId, type Mode } from './tokens'
+import { DESIGN, EFFORT, FAMILIES, NEUTRALS, PAGE_FAMILY, type FamilyId, type Mode } from './tokens'
 
 type RGB = [number, number, number]
 
@@ -79,6 +79,22 @@ describe.each(MODES)('%s mode contrast', (mode) => {
       expect(contrast(parse(f.f2).rgb, s.rgb), `${id} f2 on the ${s.name}`).toBeGreaterThanOrEqual(3)
     }
     expect(contrast(parse(n.onAccent).rgb, parse(f.f1).rgb), `${id}: a word on its strongest shade`).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
+describe.each(MODES)('%s mode effort colours (WP-51)', (mode) => {
+  const n = NEUTRALS[mode]
+  const e = EFFORT[mode]
+  it.each([['red', e.failure], ['amber', e.close], ['green', e.short]])('%s carries the button word and stands out on every surface', (_name, colour) => {
+    expect(contrast(parse(n.onAccent).rgb, parse(colour).rgb)).toBeGreaterThanOrEqual(4.5)
+    for (const s of surfaces(mode)) expect(contrast(parse(colour).rgb, s.rgb), s.name).toBeGreaterThanOrEqual(3)
+  })
+  it('white carries its own word, and its outline stands out on it', () => {
+    expect(contrast(parse(e.noneWord).rgb, parse(e.none).rgb)).toBeGreaterThanOrEqual(4.5)
+    expect(contrast(parse(n.faint).rgb, parse(e.none).rgb)).toBeGreaterThanOrEqual(3)
+  })
+  it('amber is the training page\'s own shade', () => {
+    expect(EFFORT[mode].close).toBe(FAMILIES[mode].amber.f1)
   })
 })
 

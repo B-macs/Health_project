@@ -66,7 +66,9 @@ def test_the_screen_seeds_steppers_and_saves_them_for_unloaded_exercises():
     # The seeding moved to services/prescription.py on 2026-10-19.
     seed_src = (ROOT / "services" / "prescription.py").read_text(encoding="utf-8")
     assert "prescription.seed_exercise(" in src
-    assert "sess.bodyweight_entry(ex)" in seed_src
+    # From 2026-11-20 (WP-55) the entry also reads last time's sets, for the two
+    # exercises that start at their average (tests/test_last_average_start.py).
+    assert "sess.bodyweight_entry(\n            ex, last_session_sets," in seed_src
     assert "if not loaded and not sess.reps_are_editable(ex):" in seed_src
     # The save moved to services/session_save.py on 2026-10-19 (the save the
     # phone's API uses too); tests/test_session_save.py stores a march's reps.

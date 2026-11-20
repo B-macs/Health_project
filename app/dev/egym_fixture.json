@@ -66,7 +66,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 1,
@@ -113,7 +115,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 2,
@@ -160,7 +164,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 3,
@@ -207,7 +213,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 4,
@@ -254,7 +262,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 5,
@@ -301,7 +311,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 6,
@@ -348,7 +360,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 7,
@@ -395,7 +409,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 8,
@@ -442,7 +458,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 9,
@@ -489,7 +507,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 10,
@@ -536,7 +556,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 11,
@@ -583,7 +605,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 12,
@@ -630,7 +654,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 13,
@@ -677,7 +703,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": true
+      "tonnage_entry": true,
+      "effort": null,
+      "fine_step": null
     }
   ],
   "steps": [
@@ -1344,5 +1372,6 @@
   "note": "Two sets on each machine, one after the other. Log in with your wristband and use Auto mode: EGYM sets the weight and the reps. After each set, type the tonnage the screen shows. When a machine is in use, do another first.",
   "alternatives": [],
   "reminder": null,
-  "done_today": false
+  "done_today": false,
+  "swap_targets": []
 }

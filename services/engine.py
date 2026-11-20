@@ -330,8 +330,9 @@ def suggested_weight_kg(
 #     the athlete, 2026-11-03: "Yes both arms must reach the top of the range
 #     before weight increase"): until then the rule read the right arm's reps
 #     only. A lift can carry its own, longer window (an exercise's
-#     "progression_window_days"; WP-43: "Double the time" on the Y raise, the
-#     lateral raise and the reverse crossover, 14 days).
+#     "progression_window_days"). From 2026-11-20 the four lifts on the new
+#     cable machine run REPEAT_AIM_RULE instead (repeat_aim_progression): the
+#     14-day window of WP-43 ("Double the time") is gone.
 #  4. AFTER ANY WEIGHT CHANGE THE AIM RESETS TO THE MIDDLE-BOTTOM of the range,
 #     halfway between the bottom and the middle (range_middle_bottom: 8-12 → 9,
 #     10-15 → 11).
@@ -367,6 +368,12 @@ STEP_BACK_SESSIONS = 2
 HOLD_AIM_STEP_SECONDS = 5
 #: What a set reads, and its left side's key, by `reading` (range_progression).
 _LEFT_KEY = {"reps": "reps_left", "tut": "tut_left"}
+
+#: An exercise's "progression_rule" for repeat_aim_progression (2026-11-20).
+REPEAT_AIM_RULE = "repeat_aim"
+#: Sessions with every set at the aim before the aim goes up one rep
+#: (repeat_aim_progression).
+TIMES_AT_AIM = 2
 
 
 def _round_half_up(x: float) -> int:
@@ -429,9 +436,11 @@ def range_progression(
     window_days: int = PROGRESSION_WINDOW_DAYS,
     reading: str = "reps",
     aim_step: int = 1,
+    fine_step: dict | None = None,
 ) -> dict:
     """The next session of one loaded lift with a rep range: its weight, its
     aim and why. See the LOAD PROGRESSION section above for the rules.
+    A step moves the weight through step_weight (`fine_step`, WP-53).
 
     `sessions` is the lift's recent history, NEWEST FIRST, as (date, sets):
     each date "YYYY-MM-DD", each sets the logged per-set list
@@ -488,19 +497,183 @@ def range_progression(
     week = [newest_sets] + [s for d, s in sessions[1:]
                             if _within_window(d, newest_date, window_days)]
     if allow_step and all(earns_step(s) for s in week):
-        return {"weight": round(weight + increment, 2),
+        return {"weight": step_weight(weight, 1, increment, fine_step),
                 "aim": range_middle_bottom(rep_min, rep_max),
                 "action": "step_up", "date": newest_date}
 
     recent = [s for _, s in sessions[:STEP_BACK_SESSIONS]]
-    if (len(recent) == STEP_BACK_SESSIONS and weight - increment > 0
+    lower = step_weight(weight, -1, increment, fine_step)
+    if (len(recent) == STEP_BACK_SESSIONS and 0 < lower < weight
             and all(at_weight(s) and _last_set_reps(s, reading) < rep_min for s in recent)):
-        return {"weight": round(weight - increment, 2),
+        return {"weight": lower,
                 "aim": range_middle_bottom(rep_min, rep_max),
                 "action": "step_back", "date": newest_date}
 
     return {"weight": weight, "aim": clamp(last + aim_step), "action": "hold",
             "date": newest_date}
+
+
+def step_weight(weight: float | None, direction: int, increment: float,
+                fine_step: dict | None = None) -> float:
+    """One weight step from `weight`, up (direction 1) or down (-1), never under 0.
+
+    `fine_step` (WP-53, the athlete, 2026-11-19: "back extension can go up in
+    1kg from 5kg to 10kg after that it returns to 2.5kg as per now"; his answer
+    "Agree" to the next whole kilogram from 7.5) is {"from_kg", "to_kg",
+    "step"}: inside that band the weight moves to the next whole multiple of
+    "step" (7.5 up is 8, 7.5 down is 7), and a step never jumps over the band's
+    ends (3 up is 5, 12 down is 10). Outside it the step is `increment`. The
+    phone's + and - buttons run the same rule (app/src/lib/training.ts,
+    stepWeight)."""
+    w = float(weight or 0.0)
+    inc = float(increment) if increment and increment > 0 else 1.0
+    if fine_step:
+        lo, hi, fine = float(fine_step["from_kg"]), float(fine_step["to_kg"]), float(fine_step["step"])
+        eps = 1e-9
+        if direction > 0:
+            if lo - eps <= w < hi - eps:
+                return round(min(hi, (math.floor(w / fine + eps) + 1) * fine), 2)
+            if w < lo - eps:
+                return round(min(lo, w + inc), 2)
+        else:
+            if lo + eps < w <= hi + eps:
+                return round(max(lo, (math.ceil(w / fine - eps) - 1) * fine), 2)
+            if w > hi + eps:
+                return round(max(hi, w - inc), 2)
+    return round(max(0.0, w + direction * inc), 2)
+
+
+def repeat_aim_progression(
+    rep_min: int,
+    rep_max: int,
+    sessions: list[tuple[str, list[dict]]] | None,
+    plan_weight: float,
+    plan_reps: int,
+    increment: float = 2.0,
+    allow_step: bool = True,
+    hold: bool = False,
+    prescribed_sets: int = 1,
+    fine_step: dict | None = None,
+) -> dict:
+    """The next session of a lift on REPEAT_AIM_RULE: its weight, its aim and
+    why (the athlete, 2026-11-19 and 11-20, for the four lifts on the new cable
+    machine: the Y raise, the lateral raise, the reverse crossover and the
+    standing hip flexion). It replaces the 14-day window of WP-43 on them.
+
+    His words: "the 14 day rule is only when I do 12 reps x 3 then the next
+    week I do 12 x3 again rather than 13x3. Not if I go over the amount myself
+    then it resets to that rep target. If I do 16 x 3 then it should go up the
+    weight and down to the bottom of the reps. if I do 15 x 3 when asked for 11
+    reps. it should ask to do 15 x 3 the next week, if I complete that then it
+    goes up a weight and reduce reps." His answers of 2026-11-20 ("Yes that is
+    right", "Yes bottom of the range", 3: "A - Correct is asks 12 again, B - It
+    should ask 14 not 13, C - It should go up in weight and drop in reps"):
+
+    1. Every set at the aim: the next session asks the same aim; after
+       TIMES_AT_AIM such sessions the aim goes up one rep.
+    2. More than the aim on every set: the next session asks what he did (the
+       average of the sets, rounded half up: 15, 14, 13 asks 14), and that
+       session counts as the first time at it.
+    3. A set under the aim is a miss: the same aim again, and it does not count.
+    4. Every set at the top when the aim is the top, or one set past the top:
+       the weight goes up one step and the aim goes to the bottom of the range.
+    5. A weight he chose himself (not the one asked) is taken: the rule counts
+       from that session, as rule 2 reads it, and older sessions at another
+       weight hold nothing back. The first session read is read the same way.
+    6. The last set under the range in STEP_BACK_SESSIONS sessions in a row at
+       the asked weight takes the weight back one step (range_progression's
+       rule 5), the aim to the middle-bottom.
+
+    Only the working sets at the session's weight (its last working set's)
+    count, and a session with fewer of them than prescribed counts toward
+    nothing. ON A ONE-ARM LIFT each arm is read at its own weight: a step needs
+    both arms, and "what he did" is the weaker arm's.
+
+    `sessions` is NEWEST FIRST, as range_progression's; the rule is a replay
+    of them, oldest first, so it reads as many as the caller passes
+    (Repository.get_recent_session_sets: 15). Returns range_progression's
+    {"weight", "aim", "action", "date"}, plus "times": the sessions done at
+    today's aim and weight (0 or 1). `allow_step` False holds a step the
+    newest session earned; `hold` is the failed-week hold.
+    """
+    def clamp(reps: int) -> int:
+        return max(rep_min, min(rep_max, reps))
+
+    sessions = [(d, s) for d, s in (sessions or []) if _working(s)]
+    if not sessions:
+        return {"weight": plan_weight, "aim": clamp(plan_reps), "action": "start",
+                "date": None, "times": 0}
+    newest_date, newest_sets = sessions[0]
+    if hold:
+        weight = _working_weight(newest_sets)
+        return {"weight": plan_weight if weight is None else weight,
+                "aim": clamp(_last_set_reps(newest_sets)), "action": "held",
+                "date": newest_date, "times": 0}
+
+    def arms(sets: list[dict], weight: float) -> list[list[int]]:
+        """Each arm's reps on its sets at `weight`."""
+        out = []
+        for arm in (list(sets), [_left_arm(s) for s in sets]):
+            out.append([int(s.get("reps") or 0) for s in _working(arm)
+                        if s.get("weight") is not None and abs(float(s["weight"]) - weight) < 1e-6])
+        return out
+
+    def done(reps_by_arm: list[list[int]]) -> int:
+        return min(_round_half_up(sum(r) / len(r)) for r in reps_by_arm)
+
+    weight = aim = None
+    times = under = 0
+    action = "hold"
+    for index, (_, raw) in enumerate(reversed(sessions)):
+        newest = index == len(sessions) - 1
+        sets = _working(raw)
+        lifted = _working_weight(sets)
+        if lifted is None:
+            continue
+        by_arm = arms(sets, lifted)
+        full = all(len(r) >= prescribed_sets and r for r in by_arm)
+        last_under = _last_set_reps(sets) < rep_min
+        asked = weight is not None and abs(lifted - weight) < 1e-6
+        past = full and all(any(r > rep_max for r in reps) for reps in by_arm)
+        top_done = full and asked and aim == rep_max and all(
+            all(r >= rep_max for r in reps) for reps in by_arm)
+        action = "hold"
+        if past or top_done:
+            if newest and not allow_step:
+                weight, aim, times = lifted, rep_max, 0
+                continue
+            weight, aim, times, under = step_weight(lifted, 1, increment, fine_step), rep_min, 0, 0
+            action = "step_up"
+            continue
+        if not asked:
+            # Rule 5: a weight he chose; the rule counts from here.
+            weight, under = lifted, int(last_under)
+            if not all(by_arm):
+                aim, times = clamp(plan_reps), 0
+                continue
+            did = done(by_arm)
+            aim, times = clamp(did), int(full and did >= rep_min)
+            continue
+        under = under + 1 if last_under else 0
+        lower = step_weight(weight, -1, increment, fine_step)
+        if under >= STEP_BACK_SESSIONS and 0 < lower < weight:
+            weight, aim, times, under = lower, range_middle_bottom(rep_min, rep_max), 0, 0
+            action = "step_back"
+            continue
+        if not full or any(min(reps) < aim for reps in by_arm):
+            continue  # rule 3: a miss, or too few sets: the same aim, not counted
+        did = clamp(done(by_arm))
+        if did > aim:
+            aim, times = did, 1
+        else:
+            times += 1
+            if times >= TIMES_AT_AIM:
+                aim, times = clamp(aim + 1), 0
+    if weight is None:
+        return {"weight": plan_weight, "aim": clamp(plan_reps), "action": "start",
+                "date": None, "times": 0}
+    return {"weight": weight, "aim": aim, "action": action, "date": newest_date,
+            "times": times}
 
 
 def suggested_band_tier(

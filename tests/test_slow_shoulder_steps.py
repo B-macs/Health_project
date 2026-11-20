@@ -1,6 +1,8 @@
 """WP-43 (the athlete, 2026-11-03): a weight step needs BOTH arms at the top
-of the range, and the three shoulder lifts of the new machine step only when
-every session in 14 days earned it.
+of the range, and the three shoulder lifts of the new machine stepped only when
+every session in 14 days earned it, until 2026-11-20: from then they run the
+repeat-aim rule (tests/test_repeat_aim_rule.py). The window itself stays a
+lift's own setting ("progression_window_days").
 
 His words: "Yes both arms must reach the top of the range before weight
 increase, this should already be a rule." Until this change the rule read the
@@ -67,25 +69,20 @@ def test_fourteen_days_reach_back_to_a_session_seven_days_do_not():
     assert _step(history, window_days=14)["action"] == "hold"
 
 
-def test_the_three_shoulder_lifts_carry_the_fourteen_day_window_and_the_row_does_not():
+def test_the_shoulder_lifts_left_the_fourteen_day_window_and_the_row_keeps_seven():
+    """2026-11-20: the repeat-aim rule replaced the 14 days on the shoulder lifts."""
     y = next(e for e in gb.SESSIONS["A"] if e["name"] == "Single-Arm Cable Y Raise")
     row = next(e for e in gb.SESSIONS["B"] if e["name"] == "Single-Arm DB Row")
-    assert sessions.step_window_days(y) == 14
-    assert sessions.step_window_days(row) == 7
+    assert sessions.repeats_aim(y) and "progression_window_days" not in y
+    assert not sessions.repeats_aim(row) and sessions.step_window_days(row) == 7
 
 
-def test_the_y_raise_steps_two_kg_and_says_both_arms_and_fourteen_days():
-    y = next(e for e in gb.SESSIONS["A"] if e["name"] == "Single-Arm Cable Y Raise")
-    lp = {"session_date": "2026-11-03", "reps": 15, "weight_kg": 6.0}
-    up = sessions.resolve_prescription(
-        y, lp, "normal", {"reduced": False},
-        weight_increment=y["increment_size"],
-        history=[("2026-11-03", _sets([15, 15, 15]))])
-    assert up["action"] == "step_up" and up["weight_kg"] == 8.0
+def test_the_row_says_both_arms_and_seven_days():
+    row = next(e for e in gb.SESSIONS["B"] if e["name"] == "Single-Arm DB Row")
+    lp = {"session_date": "2026-11-03", "reps": 10, "weight_kg": 20.0}
     short = sessions.resolve_prescription(
-        y, lp, "normal", {"reduced": False},
-        weight_increment=y["increment_size"],
-        history=[("2026-11-03", _sets([14, 13, 12]))])
-    assert short["next_step"] == (
-        "The weight goes up when, on both arms, every set reaches 15 reps or one set "
-        "goes past 15, in each session of this lift in 14 days.")
+        row, lp, "normal", {"reduced": False},
+        weight_increment=row["increment_size"],
+        history=[("2026-11-03", _sets([10, 9, 9], weight=20.0))])
+    assert short["next_step"].startswith("The weight goes up when, on both arms, every set")
+    assert short["next_step"].endswith("in each session of this lift in 7 days.")

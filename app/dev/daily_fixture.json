@@ -62,7 +62,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": 5,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 1,
@@ -105,7 +107,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": 5,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 2,
@@ -148,7 +152,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": 5,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 3,
@@ -191,7 +197,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 4,
@@ -234,7 +242,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": 5,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 5,
@@ -277,7 +287,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": 5,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 6,
@@ -320,7 +332,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": 5,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 7,
@@ -363,7 +377,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 8,
@@ -406,7 +422,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": 5,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 9,
@@ -449,7 +467,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": 5,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 10,
@@ -492,7 +512,9 @@
       "move": null,
       "reading": null,
       "lead_in_seconds": 5,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     }
   ],
   "steps": [
@@ -832,5 +854,6 @@
     "kind": "after",
     "time": "16:13"
   },
-  "done_today": false
+  "done_today": false,
+  "swap_targets": []
 }

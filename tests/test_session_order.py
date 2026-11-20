@@ -27,30 +27,36 @@ def test_a_ramp_set_moves_with_its_lift():
                 assert moves[ramp]["movable"] and moves[lift]["movable"]
 
 
-def test_the_warm_up_the_press_lead_in_and_the_end_of_the_session_never_move():
+def test_the_warm_up_and_the_press_lead_in_never_move():
     a = _by_name("A")
-    for name in ("Standing Psoas March", "Pec & Scar Release (Right)", "Single-Arm Cable Y Raise",
-                 "Lat-Pulldown Cable Crunch (Facing Away)", "Hip Airplane (Weighted)"):
+    for name in ("Standing Psoas March", "Pec & Scar Release (Right)", "Single-Arm Cable Y Raise"):
         assert not a[name]["movable"], name
     for name in ("Walking Lunge (DB)", "Machine Chest Press", "Machine Shoulder Press",
                  "Reverse Cable Crossover", "Adductor Machine (Seated)"):
         assert a[name]["movable"], name
 
 
-def test_the_farmer_walk_may_run_before_the_adductor_machine():
-    """2026-11-07, his note from the adductor machine on 11-06: "the only option was
-    to train the same muscle using a different exercise there was no option to go to
-    farmer walk". The farmer walk keeps its place at the end of C and may run earlier;
-    the hip airplane after it still never moves."""
-    c = _by_name("C")
-    order = list(c)
-    assert order.index("Adductor Machine (Seated)") < order.index("Farmer Walk (DB)")
-    assert c["Farmer Walk (DB)"]["movable"] and c["Farmer Walk (DB)"]["after"] == []
-    assert c["Adductor Machine (Seated)"]["movable"]
-    assert not c["Hip Airplane (Weighted)"]["movable"]
-    # Only the farmer walk leaves the end's rule: the abs and the hip work stay.
+def test_the_end_items_keep_their_place_and_may_run_earlier_when_picked():
+    """2026-11-19 (WP-49), his note from the adductor machine on 11-17: "All I wanted
+    was to change the adductor machine with the cable crunch ? but I couldnt". Every
+    item at the end (the abs, the hip work, the farmer walk) keeps its place and may
+    run earlier; from 2026-11-07 only the farmer walk could ("there was no option to
+    go to farmer walk")."""
     import goal_week as gw
-    assert gw.MOVES_EARLIER == ("Farmer Walk (DB)",)
+    end = {c.name for c in list(gw.CARDS) + list(gw.BONUS_ORDER) if c.section == "last"}
+    assert {"Lat-Pulldown Cable Crunch (Facing Away)", "Hip Airplane (Weighted)",
+            "Farmer Walk (DB)", "Reverse Crunch (Ab Mat)"} <= end
+    for letter in "ABCD":
+        moves = _by_name(letter)
+        order = list(moves)
+        last_main = max(i for i, n in enumerate(order) if n not in end and moves[n]["movable"])
+        for name in end & set(moves):
+            # Still at the end of the session, after every other lift ...
+            assert order.index(name) > last_main, (letter, name)
+            # ... and offered when a machine is in use: it waits for nothing.
+            assert moves[name]["movable"] and moves[name]["after"] == [], (letter, name)
+    a = _by_name("A")
+    assert list(a).index("Adductor Machine (Seated)") < list(a).index("Lat-Pulldown Cable Crunch (Facing Away)")
 
 
 def test_a_press_runs_only_after_the_release_and_the_y_raise():

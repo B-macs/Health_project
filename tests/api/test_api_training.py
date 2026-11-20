@@ -353,17 +353,35 @@ def test_the_hack_squats_day_carries_the_v_squat_in_its_place(env, monkeypatch):
     assert "V Squat" not in [e["name"] for e in plan["exercises"]]
     assert env.ok(monkeypatch, "get", "/api/training/session")["alternatives"] == [], "no hack squat on Monday"
 
-def test_thursdays_farmer_walk_may_run_before_the_adductor_machine(env, monkeypatch):
+def test_thursdays_end_items_may_run_before_the_adductor_machine(env, monkeypatch):
     """2026-11-07, his note from the adductor machine: "there was no option to go to
-    farmer walk". Session C sends the farmer walk with a group that moves, after the
-    adductor machine in the plan's own order; the hip airplane after it does not move."""
+    farmer walk"; 2026-11-19 (WP-49): "All I wanted was to change the adductor
+    machine with the cable crunch ? but I couldnt". Session C sends the farmer walk
+    and the hip airplane with groups that move, after the adductor machine in the
+    plan's own order."""
     plan = env.ok(monkeypatch, "get", "/api/training/session", local=MONDAY + timedelta(days=3))
     names = [e["name"] for e in plan["exercises"]]
     farmer = plan["exercises"][names.index("Farmer Walk (DB)")]
     adductor = plan["exercises"][names.index("Adductor Machine (Seated)")]
-    assert adductor["index"] < farmer["index"]
+    airplane = plan["exercises"][names.index("Hip Airplane (Weighted)")]
+    assert adductor["index"] < farmer["index"] < airplane["index"]
     assert farmer["move"]["movable"] and adductor["move"]["movable"] and farmer["move"]["after"] == []
-    assert not plan["exercises"][names.index("Hip Airplane (Weighted)")]["move"]["movable"]
+    assert airplane["move"]["movable"] and airplane["move"]["after"] == []
+
+
+def test_each_set_carries_its_effort_and_the_back_extension_its_fine_step(env, monkeypatch):
+    """WP-51: the set marker's colour comes from the engine; WP-53: the back
+    extension's + and - buttons step 1 kg from 5 to 10 kg."""
+    plan = env.ok(monkeypatch, "get", "/api/training/session", local=TUESDAY)
+    by_name = {e["name"]: e for e in plan["exercises"]}
+    assert by_name["Romanian Deadlift (DB)"]["effort"] == "stop_1_3"
+    assert by_name["Hack Squat"]["effort"] == "last_set_failure"
+    assert by_name["Reverse Crunch (Ab Mat)"]["effort"] == "failure"
+    assert by_name["Romanian Deadlift (Ramp Set)"]["effort"] is None
+    assert by_name["45° Back Extension"]["fine_step"] == {"from_kg": 5.0, "to_kg": 10.0, "step": 1.0}
+    assert by_name["Hack Squat"]["fine_step"] is None
+    hip = by_name["Standing Cable Hip Flexion"]
+    assert (hip["increment_size"], hip["increment_unit"]) == (2.0, "kg")
 
 
 def test_a_rest_day_has_no_session(env, monkeypatch):

@@ -187,6 +187,24 @@ describe('"In use? Do another first" (WP-27)', () => {
   })
 })
 
+describe('the set marker shows the effort (WP-51)', () => {
+  it('the current set carries its effort, and the note on the colours is closed until opened', () => {
+    const squat = plan.exercises.findIndex((e) => e.name === 'Made-up squat')
+    const html = render(at(firstEntry(squat)))
+    expect(html).toMatch(/tracker__chip--now"[^>]*data-effort="close"/)
+    expect(html).toContain('data-testid="effort-key"')
+    expect(html).not.toMatch(/<details[^>]*open/)
+    expect(text(html)).toContain(S.session.effortKey)
+    for (const words of Object.values(S.session.effortWords)) expect(text(html)).toContain(words)
+  })
+
+  it('an exercise with no effort target has a white marker and no note', () => {
+    const html = render(at(0))
+    expect(html).toMatch(/tracker__chip--now"[^>]*data-effort="none"/)
+    expect(html).not.toContain('data-testid="effort-key"')
+  })
+})
+
 /** Walk to an exercise's first entry, then Skip it. */
 function skipOne(s: TrainingState, exIdx: number): TrainingState {
   let t = T0

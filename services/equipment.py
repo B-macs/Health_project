@@ -9,7 +9,8 @@ rep-range rule adds (engine.range_progression).
 
 THE DEFAULTS ARE THE BLOCK'S OWN STEPS (goal_block.py): dumbbells 2.5 kg, a
 pair logged as the total 5 kg; machines 2.5 kg; the back extension a 2.5 kg
-plate; cables half a unit; the new cable machine 2 kg (WP-45). With nothing
+plate; cables half a unit; the new cable machine 2 kg (WP-45; the standing
+hip flexion on it from 2026-11-20, WP-54). With nothing
 stored, every lift steps exactly as goal_block wrote it, and a test keeps it so.
 
 A LIFT LOGGED AS A PAIR (a dumbbell in each hand, logged as the total) steps
@@ -55,6 +56,7 @@ DEFAULT_LINKS: dict[str, str] = {
     "Single-Arm Cable Y Raise": "new_cable_machine",
     "Cable Lateral Raise": "new_cable_machine",
     "Reverse Cable Crossover": "new_cable_machine",
+    "Standing Cable Hip Flexion": "new_cable_machine",
 }
 _BY_KIND = {"dumbbell": "dumbbells", "machine": "machines", "cable": "cables"}
 

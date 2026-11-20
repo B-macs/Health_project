@@ -11,7 +11,8 @@
 // THE COLOUR RULE: every page has ONE colour family, used in its shades — Today teal,
 // Training amber, Insights indigo, Settings and Check-in slate. Everything else is
 // neutral: the page, the glass cards, the text, the white button. A status (Good, Fair,
-// Pay attention) is a word, never a colour of its own.
+// Pay attention) is a word, never a colour of its own. One exception, by the owner's
+// choice (2026-11-20): the set marker's effort colours (EFFORT).
 //
 // Every colour, size, corner, line and timing a screen uses comes from here, through the
 // CSS custom properties theme.ts writes on the app's root. Sizes are in rem where text
@@ -92,6 +93,18 @@ export const NEUTRALS: Record<Mode, Neutrals> = {
     sheet: '#FFFFFF',
     scrim: 'rgba(20, 22, 30, 0.3)',
   },
+}
+
+/** The set marker's effort colours (WP-51, the owner, 2026-11-19: "Can we make the yellow
+ *  Change depending on how close to failure I should go."; 2026-11-20: "Yes I like those
+ *  colours"). THE ONE EXCEPTION TO THE COLOUR RULE, by his choice: red to failure, amber
+ *  (the training family's own strongest shade) 1-2 reps left, green 1-3 reps left; a set
+ *  with no effort target is white in both modes, with a thin outline, and its own word
+ *  colour. The three colours carry the button word. */
+export type EffortColours = { failure: string; close: string; short: string; none: string; noneWord: string }
+export const EFFORT: Record<Mode, EffortColours> = {
+  dark: { failure: '#FF9A8F', close: FAMILIES.dark.amber.f1, short: '#9BE3A6', none: '#F3F4F7', noneWord: '#0A0C12' },
+  light: { failure: '#B42318', close: FAMILIES.light.amber.f1, short: '#1E7B34', none: '#FFFFFF', noneWord: '#12141B' },
 }
 
 /** The colour family of each page. */

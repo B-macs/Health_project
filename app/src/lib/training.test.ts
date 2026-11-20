@@ -10,8 +10,8 @@ import {
   advance, asksLength, back, clockMinutes, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder,
   exerciseProgress, finished, lastRecorded, loadState, localStamp, newExerciseIds, newSessionId, saveBody, sessionEnd, setBand,
   setGarmin, setReading, setRecordedSide, setSide, sideValues, skip, skipRestOfRetest, startSessionState, stepBand,
-  stepWeight, swapCandidates, readingComplete, replaceTarget, typedReadings,
-  swapTo, UNDO_LIMIT, type Plan, type TrainingState,
+  setEffort, stepWeight, swapCandidates, readingComplete, replaceTarget, typedReadings,
+  swapTo, UNDO_LIMIT, type Exercise, type Plan, type TrainingState,
 } from './training'
 
 const plan = fixture as unknown as Plan
@@ -219,6 +219,27 @@ describe('the steppers', () => {
     expect(stepWeight(22.5, 1, 2.25)).toBe(24.75)
     expect(stepWeight(2.0, -1, 2.25)).toBe(0)
     expect(stepWeight(null, 1, 2.5)).toBe(2.5)
+  })
+
+  it('the back extension steps 1 kg from 5 to 10 kg, as the engine does (WP-53)', () => {
+    const fine = { from_kg: 5, to_kg: 10, step: 1 }
+    const up = [0]
+    while (up[up.length - 1] < 15) up.push(stepWeight(up[up.length - 1], 1, 2.5, fine))
+    expect(up).toEqual([0, 2.5, 5, 6, 7, 8, 9, 10, 12.5, 15])
+    expect(stepWeight(7.5, 1, 2.5, fine)).toBe(8)
+    expect(stepWeight(7.5, -1, 2.5, fine)).toBe(7)
+    expect(stepWeight(12.5, -1, 2.5, fine)).toBe(10)
+    expect(stepWeight(5, -1, 2.5, fine)).toBe(2.5)
+    expect(stepWeight(7.5, 1, 2.5, null)).toBe(10)
+  })
+
+  it('each set reads its effort from the exercise (WP-51)', () => {
+    const ex = (effort: Exercise['effort'], sets = 3) => ({ ...plan.exercises[2], effort, sets }) as Exercise
+    expect([1, 2, 3].map((n) => setEffort(ex('last_set_failure'), n))).toEqual(['close', 'close', 'failure'])
+    expect([1, 2, 3].map((n) => setEffort(ex('failure'), n))).toEqual(['failure', 'failure', 'failure'])
+    expect(setEffort(ex('stop_1_2'), 3)).toBe('close')
+    expect(setEffort(ex('stop_1_3'), 3)).toBe('short')
+    expect(setEffort(ex(null), 1)).toBe('none')
   })
 
   it('a band moves along the engine tiers and stops at both ends', () => {

@@ -357,6 +357,14 @@ class ExerciseMove(BaseModel):
     after: list[int]
 
 
+class FineStep(BaseModel):
+    """Inside from_kg..to_kg the weight moves to the next whole multiple of step;
+    outside it, increment_size (engine.step_weight)."""
+    from_kg: float
+    to_kg: float
+    step: float
+
+
 class SessionExercise(BaseModel):
     index: int
     name: str
@@ -410,6 +418,12 @@ class SessionExercise(BaseModel):
     #: The EGYM session (2026-11-08): the phone asks for the set's tonnage in kg,
     #: as the machine shows it, and sends it as the set's weight (one rep).
     tonnage_entry: bool = False
+    #: How close to failure the sets go (WP-51, goal_block.effort_of): the set
+    #: marker's colour. None: no effort target (a white marker).
+    effort: Literal["failure", "last_set_failure", "stop_1_2", "stop_1_3"] | None = None
+    #: A band of finer weight steps (WP-53, engine.step_weight): the back extension
+    #: steps 1 kg from 5 to 10 kg. The + and - buttons follow it.
+    fine_step: FineStep | None = None
 
 
 class DailyReminder(BaseModel):

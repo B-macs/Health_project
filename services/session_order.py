@@ -18,11 +18,12 @@ over goal_week's cards):
   station, one weight change (Key Rule 21);
 - the shoulder release and the Y raise ("block") never move, and a press may
   run only after them (`after`): they run straight before the first press;
-- the abs and hip work at the end ("last") never move: the abs are trained to
-  failure at the end of the session;
-- the farmer walk at the end of C moves (goal_week.MOVES_EARLIER, 2026-11-07,
-  his note: "there was no option to go to farmer walk"): it keeps its place at
-  the end, and runs earlier only when he picks it;
+- the items at the end ("last": the abs, the hip work, the farmer walk) keep
+  their place at the end and run earlier only when he picks them (2026-11-19,
+  WP-49, his note from the adductor machine on 11-17: "All I wanted was to
+  change the adductor machine with the cable crunch ? but I couldnt"; the
+  farmer walk alone could, from 2026-11-07, his note: "there was no option to
+  go to farmer walk");
 - a timed test never moves: a measurement keeps its place;
 - every other lift ("main") moves.
 An exercise no card names (the accessory session, an older block) does not
@@ -40,16 +41,19 @@ from __future__ import annotations
 from services import sessions
 
 MOVABLE = "main"
+#: The sections whose items may run earlier when he picks them. Their place in
+#: the session is placement.order's, unchanged.
+MOVES_WHEN_PICKED = frozenset({MOVABLE, "last"})
 
 
 def block_sections() -> dict[str, tuple[str, bool]]:
     """{exercise name: (section, is a press)} from the 12-week block's cards. An
-    item at the end that may run earlier (goal_week.MOVES_EARLIER) reads as a lift
-    that moves; its place in the session is placement.order's, unchanged."""
+    item at the end reads as a lift that moves (MOVES_WHEN_PICKED); its place in
+    the session is placement.order's, unchanged."""
     import goal_week as gw  # the cards hold each exercise's section (placement.order)
     cards = list(gw.WARMUP) + list(gw.CARDS) + list(gw.BONUS_ORDER)
-    earlier = set(gw.MOVES_EARLIER)
-    return {c.name: (MOVABLE if c.name in earlier else c.section, bool(c.is_press)) for c in cards}
+    return {c.name: (MOVABLE if c.section in MOVES_WHEN_PICKED else c.section, bool(c.is_press))
+            for c in cards}
 
 
 def alternatives_for(name: str) -> list[dict]:

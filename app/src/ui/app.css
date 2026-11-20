@@ -675,6 +675,68 @@ ul {
   box-shadow: 0 0 var(--glow) var(--f-glow);
 }
 
+/* The current set's effort (WP-51, the owner's choice, 2026-11-20): red to failure, amber
+ * 1-2 reps left, green 1-3 reps left, white no effort target. The one place a page draws
+ * outside its family; the colours are design/tokens.ts's EFFORT. */
+.tracker__chip--now[data-effort='failure'] {
+  background: var(--effort-failure);
+  box-shadow: none;
+}
+
+.tracker__chip--now[data-effort='close'] {
+  background: var(--effort-close);
+}
+
+.tracker__chip--now[data-effort='short'] {
+  background: var(--effort-short);
+  box-shadow: none;
+}
+
+.tracker__chip--now[data-effort='none'] {
+  background: var(--effort-none);
+  color: var(--effort-none-word);
+  box-shadow: inset 0 0 0 var(--hair) var(--faint);
+}
+
+.effortkey__list {
+  display: grid;
+  gap: var(--sp-xs);
+  margin-top: var(--sp-xs);
+}
+
+.effortkey__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-s);
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.effortkey__dot {
+  flex: none;
+  width: var(--icon);
+  height: var(--icon);
+  border-radius: var(--r-pill);
+  box-shadow: inset 0 0 0 var(--hair) var(--glass-line);
+}
+
+.effortkey__dot[data-effort='failure'] {
+  background: var(--effort-failure);
+}
+
+.effortkey__dot[data-effort='close'] {
+  background: var(--effort-close);
+}
+
+.effortkey__dot[data-effort='short'] {
+  background: var(--effort-short);
+}
+
+.effortkey__dot[data-effort='none'] {
+  background: var(--effort-none);
+  box-shadow: inset 0 0 0 var(--hair) var(--faint);
+}
+
 .tracker__set {
   font-size: var(--fs-caption);
   font-weight: var(--w-title);

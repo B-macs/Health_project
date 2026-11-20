@@ -71,7 +71,8 @@ def seed_exercise(repo, ex: dict, *, streak_label: str, policy: dict, today: dat
     if lift_entry is not None:
         return Seed(previous, sess.ramp_entry(ex, lift_entry))
     if not loaded:
-        return Seed(previous, sess.bodyweight_entry(ex))
+        return Seed(previous, sess.bodyweight_entry(
+            ex, last_session_sets, (last or {}).get("session_date")))
     history = None
     if ((ex.get("rep_min") is not None and ex.get("rep_max") is not None)
             or (ex.get("hold_min") is not None and ex.get("hold_max") is not None)):

@@ -61,7 +61,7 @@ import cluster_a_prescription as _rx
 import egym_circuit as _egym
 import front_split_mechanics as _fs_mech
 import front_split_prescription as _fs_rx
-from training_plan import _ex
+from training_plan import _ex as _plan_ex
 
 BLOCK_NAME = "12-Week Block — Hips, Back and Strength"
 WEEKS = 12
@@ -113,26 +113,64 @@ CABLE_UNIT = 0.5
 #: The new cable machine, in kg (WP-45, the athlete, 2026-11-03: "I have found a
 #: new machine which is better for all the listed exercises, but I can only go
 #: up in 2kg"): the Y raise, the lateral raise and the reverse crossover step
-#: 2 kg on it. Same exercises ("New machine not new exercise"), same names and
-#: the stored history as it is ("dont touch the previous setting just leave it
-#: as is"); every other cable keeps half a unit.
-SHOULDER_MACHINE_KG = 2.0
-#: Those three shoulder lifts step only when every session of the lift in 14
-#: days earned it, twice the usual window (WP-43, 2026-11-03: "We need to go
-#: more gradually up with single arm exercises, esp shoulder double the time";
-#: "Double the time means a"; "Single arm db row can stay the same rule").
-SHOULDER_WINDOW_DAYS = 14
+#: 2 kg on it, and from 2026-11-20 the standing cable hip flexion (WP-54, his
+#: note: "Standing hip flexion goes up in 2kg not half kg"). Same exercises
+#: ("New machine not new exercise"), same names and the stored history as it is
+#: ("dont touch the previous setting just leave it as is"); every other cable
+#: keeps half a unit.
+NEW_CABLE_MACHINE_KG = 2.0
 
 
-def _on_shoulder_machine(ex: dict) -> dict:
-    """One of the three shoulder lifts on the new machine: 2 kg steps, in kg,
-    and the 14-day window (engine.range_progression's window_days)."""
-    return {**ex, "increment_size": SHOULDER_MACHINE_KG, "increment_unit": "kg",
-            "progression_window_days": SHOULDER_WINDOW_DAYS}
+def _on_new_cable_machine(ex: dict) -> dict:
+    """A lift on the new cable machine: 2 kg steps, in kg, and the repeat-aim
+    rule (engine.repeat_aim_progression, his rule of 2026-11-19, which replaced
+    the 14-day window of WP-43 on the three shoulder lifts: "the 14 day rule is
+    only when I do 12 reps x 3 then the next week I do 12 x3 again rather than
+    13x3"; WP-54, answer 7: the hip flexion follows the same rule)."""
+    return {**ex, "increment_size": NEW_CABLE_MACHINE_KG, "increment_unit": "kg",
+            "progression_rule": "repeat_aim"}
 
 _EVERY_SET_TO_FAILURE = "Take every set to failure."
 _LAST_SET_TO_FAILURE = "Stop each working set 1-2 reps before failure; take the last set to failure."
 _NEVER_TO_FAILURE = "Stop every set 1-3 reps before failure; never take a set to failure."
+
+#: How close to failure the sets of an exercise go, as the phone colours the set
+#: marker (WP-51, the athlete, 2026-11-19: "Can we make the yellow Change
+#: depending on how close to failure I should go."; 2026-11-20: "Yes I like
+#: those colours"): red to failure, amber 1-2 reps left, green 1-3 reps left,
+#: white no effort target (effort_of None).
+EFFORT_FAILURE = "failure"
+EFFORT_LAST_SET = "last_set_failure"
+EFFORT_STOP_1_2 = "stop_1_2"
+EFFORT_STOP_1_3 = "stop_1_3"
+_EFFORT_BY_TEXT = ((_EVERY_SET_TO_FAILURE, EFFORT_FAILURE), (_LAST_SET_TO_FAILURE, EFFORT_LAST_SET),
+                   (_NEVER_TO_FAILURE, EFFORT_STOP_1_3))
+#: The three whose how-to says the effort in its own words: the Y raise "Stop
+#: every set 1-2 reps before failure: a press comes next", the adductor machine
+#: "never to failure: stop 1-2 reps before", the hip flexion "never to failure:
+#: stop when the position starts to slip".
+_EFFORT_BY_NAME = {"Single-Arm Cable Y Raise": EFFORT_STOP_1_2,
+                   "Adductor Machine (Seated)": EFFORT_STOP_1_2,
+                   "Standing Cable Hip Flexion": EFFORT_STOP_1_3}
+
+
+def effort_of(ex: dict) -> str | None:
+    """The effort of an exercise's sets (EFFORT_*), read from the how-to text he
+    reads, so the colour and the words never disagree; None for the warm-up, a
+    ramp set, a hold, the EGYM machines and anything outside the block."""
+    mechanics = ex.get("mechanics") or ""
+    for text, effort in _EFFORT_BY_TEXT:
+        if text in mechanics:
+            return effort
+    return _EFFORT_BY_NAME.get(ex.get("name") or "")
+
+
+def _ex(*args, **kwargs) -> dict:
+    """training_plan's exercise builder, with the block's effort on the exercise
+    ("effort", effort_of) where it has one: the engine sends it as it is."""
+    ex = _plan_ex(*args, **kwargs)
+    effort = effort_of(ex)
+    return {**ex, "effort": effort} if effort else ex
 
 
 # ─── The warm-up (step 7) ────────────────────────────────────────────────────
@@ -193,7 +231,7 @@ SHOULDER_RELEASE = _ex(
     regression="Any arm symptom → leave the ball out today and do the scar work only.",
 )
 
-Y_RAISE = _on_shoulder_machine(_ex(
+Y_RAISE = _on_new_cable_machine(_ex(
     name="Single-Arm Cable Y Raise",
     ex_type="reps",
     laterality="unilateral",
@@ -370,7 +408,13 @@ V_SQUAT = _ex(
     regression="The hips lift off the pad at the bottom → stop the descent just above that point.",
 )
 
-BACK_EXTENSION = _ex(
+#: The back extension steps 1 kg from 5 to 10 kg, and a plate outside that
+#: (WP-53, the athlete, 2026-11-19: "back extension can go up in 1kg from 5kg to
+#: 10kg after that it returns to 2.5kg as per now"; his answer "Agree" to the
+#: next whole kilogram from 7.5: 8, 9, 10, then 12.5). engine.step_weight.
+BACK_EXTENSION_FINE_STEP = {"from_kg": 5.0, "to_kg": 10.0, "step": 1.0}
+
+BACK_EXTENSION = {**_ex(
     name="45° Back Extension",
     ex_type="reps",
     sets=3, reps=12, rest_seconds=75,
@@ -391,9 +435,9 @@ BACK_EXTENSION = _ex(
         "right L5/S1 foramen (rules: 'back extension', caution). Starts at body weight; the "
         "rule adds a 2.5 kg plate."
     ),
-    progression="The rep-range rule adds a 2.5 kg plate.",
+    progression="The rep-range rule adds 1 kg from 5 to 10 kg, else a 2.5 kg plate.",
     regression="Any leg symptom on the right → stop the set; log it.",
-)
+), "fine_step": BACK_EXTENSION_FINE_STEP}
 
 ROW = _ex(
     name="Single-Arm DB Row",
@@ -439,7 +483,7 @@ LEG_CURL = _ex(
     regression="A cramp at the back of the thigh → stop the set; lower the weight next time.",
 )
 
-CROSSOVER = _on_shoulder_machine(_ex(
+CROSSOVER = _on_new_cable_machine(_ex(
     name="Reverse Cable Crossover",
     ex_type="reps",
     sets=3, reps=15, rest_seconds=45,
@@ -464,7 +508,7 @@ CROSSOVER = _on_shoulder_machine(_ex(
     regression="The right shoulder objects at the end → finish the arc in front of the body.",
 ))
 
-LATERAL_RAISE = _on_shoulder_machine(_ex(
+LATERAL_RAISE = _on_new_cable_machine(_ex(
     name="Cable Lateral Raise",
     ex_type="reps",
     laterality="unilateral",
@@ -512,7 +556,7 @@ ADDUCTOR_MACHINE = _ex(
     regression="A pull high in the groin → narrow the start width.",
 )
 
-HIP_FLEXION = _ex(
+HIP_FLEXION = _on_new_cable_machine(_ex(
     name="Standing Cable Hip Flexion",
     ex_type="reps",
     laterality="unilateral",
@@ -533,9 +577,9 @@ HIP_FLEXION = _ex(
         "the end-range psoas isometric on 2026-10-16. Standing, not lying: lying on his back "
         "is where the right hip clicked at about 45 degrees (finding #4)."
     ),
-    progression="The rep-range rule adds half a unit.",
+    progression="The rule adds 2 kg.",
     regression="A click at the right hip → start the lift from less far behind you.",
-)
+))
 
 
 # ─── The abs, and the hip airplane (last in the session, step 6 S4) ──────────
@@ -561,7 +605,13 @@ CABLE_CRUNCH = _ex(
     regression="The hip flexors take over → sit more upright at the start and curl less far.",
 )
 
-REVERSE_CRUNCH = _ex(
+#: The reverse crunch and the side plank with hip raises start at the average
+#: of last time's sets (WP-55, the athlete, 2026-11-19: "Reverse crunch should
+#: start what the average of the reps I performed the previous time not always
+#: 12"; his answer "Agree" to both exercises, rounded to the nearest whole rep).
+LAST_AVERAGE_START = {"start_from_last_average": True}
+
+REVERSE_CRUNCH = {**_ex(
     name="Reverse Crunch (Ab Mat)",
     ex_type="reps",
     sets=3, reps=12, rest_seconds=60,
@@ -580,7 +630,7 @@ REVERSE_CRUNCH = _ex(
     ),
     progression="Every set past 15 → hold the top for one second.",
     regression="The lower back arches off the mat → curl less far.",
-)
+), **LAST_AVERAGE_START}
 
 WOODCHOP = _ex(
     name="High-to-Low Cable Woodchop",
@@ -606,7 +656,7 @@ WOODCHOP = _ex(
     regression="You feel the turn in the lower back → turn less far.",
 )
 
-SIDE_PLANK = _ex(
+SIDE_PLANK = {**_ex(
     name="Side Plank with Hip Raises",
     ex_type="reps",
     laterality="unilateral",
@@ -625,7 +675,7 @@ SIDE_PLANK = _ex(
     ),
     progression="Every set past 15 → hold a 2 kg plate on the top hip.",
     regression="The support shoulder objects → do it from the knees.",
-)
+), **LAST_AVERAGE_START}
 
 HIP_AIRPLANE = _ex(
     name="Hip Airplane (Weighted)",

@@ -25,7 +25,7 @@ import {
 import {
   advance, back, backTarget, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder, exerciseProgress, finished,
   lastRecorded, readingComplete, setBand, setGarmin, setNote, setReading, setRecordedSide, setSide, sideValues, skip,
-  replaceTarget, skipRestOfRetest, stepBand, stepWeight, swapCandidates, swapTo, timerHere, typedReadings, withTimer,
+  replaceTarget, setEffort, skipRestOfRetest, stepBand, stepWeight, swapCandidates, swapTo, timerHere, typedReadings, withTimer,
   type Alternative, type Exercise, type FlowStep, type GarminPull, type Side, type SideValues, type TrainingState,
 } from '../lib/training'
 import { useCached } from '../lib/cache'
@@ -134,16 +134,36 @@ function Chips({ s, step }: { s: TrainingState; step: FlowStep }) {
     <ol className="tracker">
       {chips.map(({ st, i }) => {
         const state = i < s.step ? 'done' : i === s.step ? 'now' : 'todo'
+        const ex = exerciseOf(s, st)
         return (
-          <li key={i} className={`tracker__chip tracker__chip--${state}`}>
+          <li key={i} className={`tracker__chip tracker__chip--${state}`}
+            data-effort={ex ? setEffort(ex, st.set_num) : 'none'}>
             <span className="tracker__set">{S.session.setN(st.set_num)}</span>
             <span className="tracker__side">
-              {state === 'done' ? <IconCheck /> : exerciseOf(s, st)?.laterality === 'unilateral' ? S.session.sideShort[st.side] : ''}
+              {state === 'done' ? <IconCheck /> : ex?.laterality === 'unilateral' ? S.session.sideShort[st.side] : ''}
             </span>
           </li>
         )
       })}
     </ol>
+  )
+}
+
+/** What the set colours mean (WP-51, the owner, 2026-11-20: "Hide a note somewhere so I can
+ *  toggle to open to reread the colours"): closed until he opens it. */
+function EffortKey() {
+  return (
+    <details className="guide effortkey" data-testid="effort-key">
+      <summary className="tapline">{S.session.effortKey}</summary>
+      <ul className="effortkey__list">
+        {(['failure', 'close', 'short', 'none'] as const).map((e) => (
+          <li key={e} className="effortkey__item">
+            <span className="effortkey__dot" data-effort={e} aria-hidden="true" />
+            <span>{S.session.effortWords[e]}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
   )
 }
 
@@ -213,8 +233,8 @@ function SideRow({ ex, title, prefix, values, onChange }: {
         {show.weight && (
           <MiniStepper label={S.session.weight} name={S.session.named(prefix, S.session.weight)}
             value={weightText(ex, values.weight_kg)}
-            onLess={() => onChange({ weight_kg: stepWeight(values.weight_kg ?? null, -1, ex.increment_size) })}
-            onMore={() => onChange({ weight_kg: stepWeight(values.weight_kg ?? null, 1, ex.increment_size) })} />
+            onLess={() => onChange({ weight_kg: stepWeight(values.weight_kg ?? null, -1, ex.increment_size, ex.fine_step) })}
+            onMore={() => onChange({ weight_kg: stepWeight(values.weight_kg ?? null, 1, ex.increment_size, ex.fine_step) })} />
         )}
       </div>
     </div>
@@ -272,8 +292,8 @@ function Steppers({ s, step, ex, update }: {
       {showWeight && (
         <Stepper label={S.session.weight}
           value={weightText(ex, values.weight_kg)}
-          onLess={() => update((x) => setSide(x, ex.index, side, { weight_kg: stepWeight(values.weight_kg, -1, ex.increment_size) }))}
-          onMore={() => update((x) => setSide(x, ex.index, side, { weight_kg: stepWeight(values.weight_kg, 1, ex.increment_size) }))} />
+          onLess={() => update((x) => setSide(x, ex.index, side, { weight_kg: stepWeight(values.weight_kg, -1, ex.increment_size, ex.fine_step) }))}
+          onMore={() => update((x) => setSide(x, ex.index, side, { weight_kg: stepWeight(values.weight_kg, 1, ex.increment_size, ex.fine_step) }))} />
       )}
       {showBand && (
         <Stepper label={S.session.band}
@@ -666,6 +686,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
         {ex.laterality === 'unilateral' && !resting && <span className="word">{S.session.side[step.side]}</span>}
         {ex.type === 'hold_reps' && !resting && <span className="caption">{S.session.repOf(step.rep, ex.reps_in_set ?? 1)}</span>}
         <Chips s={s} step={step} />
+        {ex.effort && <EffortKey />}
         {ex.warning && <p className="alert" data-testid="warning">{ex.warning}</p>}
       </section>
 

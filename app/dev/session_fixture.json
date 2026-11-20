@@ -66,7 +66,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 1,
@@ -119,7 +121,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 2,
@@ -175,7 +179,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": "last_set_failure",
+      "fine_step": null
     },
     {
       "index": 3,
@@ -228,7 +234,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 4,
@@ -275,7 +283,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 5,
@@ -322,7 +332,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 6,
@@ -375,7 +387,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 7,
@@ -422,7 +436,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     },
     {
       "index": 8,
@@ -472,7 +488,9 @@
       },
       "reading": null,
       "lead_in_seconds": null,
-      "tonnage_entry": false
+      "tonnage_entry": false,
+      "effort": null,
+      "fine_step": null
     }
   ],
   "steps": [
@@ -1062,7 +1080,9 @@
           },
           "reading": null,
           "lead_in_seconds": null,
-          "tonnage_entry": false
+          "tonnage_entry": false,
+          "effort": null,
+          "fine_step": null
         }
       ],
       "steps": [
@@ -1115,5 +1135,6 @@
     }
   ],
   "reminder": null,
-  "done_today": false
+  "done_today": false,
+  "swap_targets": []
 }

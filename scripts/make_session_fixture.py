@@ -102,6 +102,8 @@ def build() -> dict:
                                minutes + sess.GARMIN_ACTIVITY_BUFFER_MINUTES] if pulls else None),
             "estimated_minutes": max(1, round(sess.exercise_duration_seconds(ex) / 60)),
             "move": moves[i],
+            # The set marker's colour (WP-51): the made-up squat's last set to failure.
+            "effort": "last_set_failure" if i == 2 else None,
         })
     # A swap for the made-up squat (WP-28), numbered from 0 with its own walk, as
     # training_session._alternatives sends one.

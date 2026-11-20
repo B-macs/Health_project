@@ -4,7 +4,7 @@
 // page's class (.fam-teal and so on) picks one as --f1, --f2, --f3, --f-glow and
 // --f-soft. The mode is the iPhone's own setting unless the owner picks one.
 import { useEffect, useState } from 'react'
-import { DESIGN, FAMILIES, NEUTRALS, type FamilyId, type Family, type Mode } from './tokens'
+import { DESIGN, EFFORT, FAMILIES, NEUTRALS, type FamilyId, type Family, type Mode } from './tokens'
 
 export type ThemePref = 'auto' | Mode
 
@@ -26,6 +26,11 @@ export function cssVars(mode: Mode, reduced: boolean): Record<string, string> {
     '--shadow': n.shadow,
     '--sheet': n.sheet,
     '--scrim': n.scrim,
+    '--effort-failure': EFFORT[mode].failure,
+    '--effort-close': EFFORT[mode].close,
+    '--effort-short': EFFORT[mode].short,
+    '--effort-none': EFFORT[mode].none,
+    '--effort-none-word': EFFORT[mode].noneWord,
     '--font-body': d.fontBody,
     '--font-number': d.fontNumber,
     '--font-mono': d.fontMono,

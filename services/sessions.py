@@ -491,11 +491,39 @@ def reps_are_editable(ex: dict) -> bool:
                                          or bool(ex.get("reps")))
 
 
-def bodyweight_entry(ex: dict) -> dict:
+#: The `source` of an unloaded entry that starts at last time's average (WP-55).
+LAST_AVERAGE_SOURCE = "last_average"
+
+
+def last_average_reps(sets: list[dict] | None) -> int | None:
+    """The average reps of a session's working sets, rounded half up (WP-55:
+    14, 14, 12 is 13); on a one-side exercise both sides count, the left side
+    read as the right where it is not stored. None with no set."""
+    values: list[float] = []
+    for s in sets or []:
+        if s.get("is_warmup") or s.get("reps") is None:
+            continue
+        # Each set counts both sides; a bilateral set reads the same value twice.
+        values.append(float(s["reps"]))
+        values.append(float(s["reps"] if s.get("reps_left") is None else s["reps_left"]))
+    if not values:
+        return None
+    return engine._round_half_up(sum(values) / len(values))
+
+
+def bodyweight_entry(ex: dict, last_sets: list[dict] | None = None,
+                     last_date: str | None = None) -> dict:
     """The stepper entry for an unloaded "reps" exercise: today's prescribed
     reps as the start value, and no weight or band. Nothing about an unloaded
-    item is seeded from history or progressed by itself — the prescription is
-    the proposal, and the previous session shows beside it as a reading."""
+    item is progressed by itself — the prescription is the proposal, and the
+    previous session shows beside it as a reading. One named exception
+    (WP-55, 2026-11-19): an exercise marked "start_from_last_average" (the
+    reverse crunch and the side plank with hip raises, both to failure with no
+    range) starts at the average of last time's sets, `last_sets`."""
+    average = last_average_reps(last_sets) if ex.get("start_from_last_average") else None
+    if average is not None:
+        return {"reps": average, "weight_kg": None, "band_tier": None,
+                "source": LAST_AVERAGE_SOURCE, "last_seen_date": last_date, "clamped": {}}
     return {"reps": planned_reps(ex), "weight_kg": None, "band_tier": None,
             "source": BODYWEIGHT_SOURCE, "last_seen_date": None, "clamped": {}}
 
@@ -807,20 +835,28 @@ def seed_actual_entry(
     ):
         if history is None and last_session_sets and (last_performance or {}).get("session_date"):
             history = [(last_performance["session_date"], last_session_sets)]
-        plan = engine.range_progression(
-            rep_min, rep_max, history, entry["weight_kg"], entry["reps"],
-            increment=weight_increment, allow_step=allow_increase, hold=hold,
-            prescribed_sets=ex.get("sets", 1),
-            window_days=step_window_days(ex),
-        )
+        if repeats_aim(ex):
+            plan = engine.repeat_aim_progression(
+                rep_min, rep_max, history, entry["weight_kg"], entry["reps"],
+                increment=weight_increment, allow_step=allow_increase, hold=hold,
+                prescribed_sets=ex.get("sets", 1), fine_step=ex.get("fine_step"),
+            )
+        else:
+            plan = engine.range_progression(
+                rep_min, rep_max, history, entry["weight_kg"], entry["reps"],
+                increment=weight_increment, allow_step=allow_increase, hold=hold,
+                prescribed_sets=ex.get("sets", 1),
+                window_days=step_window_days(ex), fine_step=ex.get("fine_step"),
+            )
         entry.update(rep_min=rep_min, rep_max=rep_max)
         if plan["action"] != "start":
             entry.update(weight_kg=plan["weight"], reps=plan["aim"], source=RANGE_SOURCE,
                          action=plan["action"], last_seen_date=plan["date"])
+            if "times" in plan:
+                entry["times_at_aim"] = plan["times"]
             if plan["action"] != "step_up":
-                entry["weight_kg"] = engine.suggested_weight_kg(
-                    entry["weight_kg"], streak_label, increment=weight_increment,
-                )
+                entry["weight_kg"] = _readiness_weight(ex, entry["weight_kg"], streak_label,
+                                                       weight_increment)
             return entry
 
     # A timed lift with a seconds range (WP-47, the farmer walk): the same rule
@@ -1374,9 +1410,27 @@ def resolve_prescription(
 def step_window_days(ex: dict) -> int:
     """How many days back every session of this lift must have earned a step
     (engine.range_progression's window_days): the exercise's own
-    "progression_window_days" (WP-43: 14 on the three shoulder lifts of the
-    new machine), else engine.PROGRESSION_WINDOW_DAYS."""
+    "progression_window_days", else engine.PROGRESSION_WINDOW_DAYS. (WP-43's
+    14 days on the three shoulder lifts of the new machine ended on
+    2026-11-20: they run the repeat-aim rule, repeats_aim.)"""
     return int(ex.get("progression_window_days") or engine.PROGRESSION_WINDOW_DAYS)
+
+
+def repeats_aim(ex: dict) -> bool:
+    """Whether this lift runs the repeat-aim rule (engine.repeat_aim_progression):
+    the four lifts on the new cable machine, from 2026-11-20."""
+    return ex.get("progression_rule") == engine.REPEAT_AIM_RULE
+
+
+def _readiness_weight(ex: dict, weight: float | None, streak_label: str,
+                      increment: float) -> float | None:
+    """The readiness nudge (engine.suggested_weight_kg: one step down on a low
+    streak, never up), through the lift's own fine step where it has one
+    (WP-53: the back extension at 8 kg goes to 7 kg, not 5.5)."""
+    lowered = engine.suggested_weight_kg(weight, streak_label, increment=increment)
+    if ex.get("fine_step") and weight is not None and lowered is not None and lowered < weight:
+        return engine.step_weight(weight, -1, increment, ex["fine_step"])
+    return lowered
 
 
 def next_step_caption(ex: dict, entry: dict) -> str:
@@ -1395,8 +1449,12 @@ def next_step_caption(ex: dict, entry: dict) -> str:
     if (rep_min is None or rep_max is None or ex.get("type") != "reps"
             or ex.get("equipment_type") in (None, "band") or entry.get("weight_kg") is None):
         return ""
-    days = step_window_days(ex)
     arms = ", on both arms," if ex.get("laterality") == "unilateral" else ""
+    if repeats_aim(ex):
+        return (f"The aim goes up one rep after two sessions with every set at the aim. The "
+                f"weight goes up when{arms} every set reaches {rep_max} with an aim of {rep_max}, "
+                f"or one set goes past {rep_max}.")
+    days = step_window_days(ex)
     return (f"The weight goes up when{arms} every set reaches {rep_max} reps or one set "
             f"goes past {rep_max}, in each session of this lift in {days} days.")
 
@@ -1468,12 +1526,20 @@ def actual_caption(entry: dict) -> str:
     source = entry.get("source")
     date_part = f" ({entry['last_seen_date']})" if entry.get("last_seen_date") else ""
     action = entry.get("action")
-    if source == RANGE_SOURCE and action == "step_up":
+    if source == RANGE_SOURCE and action == "step_up" and "times_at_aim" in entry:
+        base = (f"Every set reached the top of the range, or one set went past it"
+                f"{date_part}, so the weight goes up one step today, and the aim is the "
+                "bottom of the range.")
+    elif source == RANGE_SOURCE and action == "step_up":
         base = (f"Every set reached the top of the range, or one set went past it"
                 f"{date_part}, so the weight goes up one step today.")
     elif source == RANGE_SOURCE and action == "step_back":
         base = (f"Your last set was under the range in your last two sessions{date_part}, "
                 "so the weight goes down one step today.")
+    elif source == RANGE_SOURCE and action == "hold" and "times_at_aim" in entry:
+        once = (" You did this aim once: do it once more and the aim goes up one rep."
+                if entry["times_at_aim"] == 1 else "")
+        base = f"Same weight as your last logged session{date_part}.{once}"
     elif source == RANGE_SOURCE and action == "hold":
         base = (f"Same weight as your last logged session{date_part}. The aim is one "
                 "rep more than your last set made, up to the top of the range.")
@@ -1481,6 +1547,9 @@ def actual_caption(entry: dict) -> str:
         base = f"Starting from your last logged session{date_part}."
     elif source == BODYWEIGHT_SOURCE:
         base = "Today's planned reps. Change them if you do a different number."
+    elif source == LAST_AVERAGE_SOURCE:
+        base = (f"The average of your sets last time{date_part}. Change them if you do a "
+                "different number.")
     elif source == RAMP_SOURCE:
         base = "About 60% of the weight of the lift that follows."
     elif entry.get("rep_min") is not None:

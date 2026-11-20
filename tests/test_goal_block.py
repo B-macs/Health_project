@@ -209,10 +209,11 @@ def test_every_exercise_lands_on_a_safety_rule():
 _CARDS = {c.name: c for c in gw.CARDS + gw.BONUS_ORDER}
 _STEPS = {"dumbbell": {gb.DUMBBELL_KG, gb.DUMBBELL_PAIR_KG},
           "machine": {gb.MACHINE_KG, gb.PLATE_KG},
-          "cable": {gb.CABLE_UNIT, gb.SHOULDER_MACHINE_KG}}
-#: On the new machine, in kg (WP-45, 2026-11-03).
+          "cable": {gb.CABLE_UNIT, gb.NEW_CABLE_MACHINE_KG}}
+#: On the new machine, in kg (WP-45, 2026-11-03; the hip flexion from
+#: 2026-11-20, WP-54).
 _SHOULDER_MACHINE_LIFTS = {"Single-Arm Cable Y Raise", "Cable Lateral Raise",
-                           "Reverse Cable Crossover"}
+                           "Reverse Cable Crossover", "Standing Cable Hip Flexion"}
 
 
 def _training(day):
@@ -289,19 +290,22 @@ def test_every_other_cable_steps_half_a_unit():
                           for e in cables)
 
 
-def test_the_three_shoulder_lifts_step_two_kg_over_fourteen_days():
-    """WP-43 and WP-45, the athlete, 2026-11-03: "I have found a new machine
-    which is better for all the listed exercises, but I can only go up in
-    2kg"; "Double the time means a"; "Single arm db row can stay the same
-    rule". Same names, so the stored history carries on."""
-    assert gb.SHOULDER_MACHINE_KG == 2.0 and gb.SHOULDER_WINDOW_DAYS == 14
+def test_the_four_lifts_on_the_new_machine_step_two_kg_on_the_repeat_aim_rule():
+    """WP-45, the athlete, 2026-11-03: "I have found a new machine which is
+    better for all the listed exercises, but I can only go up in 2kg"; the hip
+    flexion on it from 2026-11-20 (WP-54: "Standing hip flexion goes up in 2kg
+    not half kg"). Their rule is the repeat-aim rule (2026-11-20), which
+    replaced WP-43's 14 days; every other lift with a range keeps 7 days.
+    Same names, so the stored history carries on."""
+    assert gb.NEW_CABLE_MACHINE_KG == 2.0
     seen = set()
     for _, _, e in _every_entry():
         if e["name"] in _SHOULDER_MACHINE_LIFTS:
             seen.add(e["name"])
             assert (e["increment_size"], e["increment_unit"]) == (2.0, "kg"), e["name"]
-            assert s.step_window_days(e) == 14, e["name"]
+            assert s.repeats_aim(e), e["name"]
         elif e.get("rep_min") is not None:
+            assert not s.repeats_aim(e), e["name"]
             assert s.step_window_days(e) == engine.PROGRESSION_WINDOW_DAYS == 7, e["name"]
     assert seen == _SHOULDER_MACHINE_LIFTS
 

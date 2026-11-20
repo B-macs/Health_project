@@ -1583,6 +1583,30 @@
         "title": "ExerciseMove",
         "type": "object"
       },
+      "FineStep": {
+        "description": "Inside from_kg..to_kg the weight moves to the next whole multiple of step;\noutside it, increment_size (engine.step_weight).",
+        "properties": {
+          "from_kg": {
+            "title": "From Kg",
+            "type": "number"
+          },
+          "step": {
+            "title": "Step",
+            "type": "number"
+          },
+          "to_kg": {
+            "title": "To Kg",
+            "type": "number"
+          }
+        },
+        "required": [
+          "from_kg",
+          "to_kg",
+          "step"
+        ],
+        "title": "FineStep",
+        "type": "object"
+      },
       "FlexCapture": {
         "properties": {
           "cluster": {
@@ -5973,6 +5997,23 @@
             ],
             "title": "Duration Minutes"
           },
+          "effort": {
+            "anyOf": [
+              {
+                "enum": [
+                  "failure",
+                  "last_set_failure",
+                  "stop_1_2",
+                  "stop_1_3"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effort"
+          },
           "entry": {
             "anyOf": [
               {
@@ -6003,6 +6044,16 @@
           "estimated_minutes": {
             "title": "Estimated Minutes",
             "type": "integer"
+          },
+          "fine_step": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FineStep"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "garmin_pull": {
             "title": "Garmin Pull",

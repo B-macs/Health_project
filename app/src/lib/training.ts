@@ -512,10 +512,44 @@ export function setNote(s: TrainingState, exIdx: number, note: string): Training
 }
 
 /** One weight step by the engine's increment, snapped to whole increments, never below 0. */
-export function stepWeight(weight: number | null, direction: 1 | -1, increment: number | null): number {
+export type FineStep = Schemas['FineStep']
+
+/** One weight step, up or down, never under 0. Inside a fine step's band (WP-53: the back
+ *  extension, 1 kg from 5 to 10 kg) the weight moves to the next whole multiple of its step
+ *  (7.5 up is 8, down is 7) and never jumps over the band's ends; outside it, `increment`.
+ *  The engine's own rule is the same (services/engine.py, step_weight). */
+export function stepWeight(weight: number | null, direction: 1 | -1, increment: number | null,
+  fine?: FineStep | null): number {
   const inc = increment && increment > 0 ? increment : 1
-  const stepped = Math.round(((weight ?? 0) + direction * inc) / inc) * inc
-  return Math.max(0, Math.round(stepped * 100) / 100)
+  const w = weight ?? 0
+  const eps = 1e-9
+  const r2 = (x: number) => Math.round(x * 100) / 100
+  if (fine && fine.step > 0) {
+    const { from_kg: lo, to_kg: hi, step } = fine
+    if (direction > 0) {
+      if (w >= lo - eps && w < hi - eps) return r2(Math.min(hi, (Math.floor(w / step + eps) + 1) * step))
+      if (w < lo - eps) return r2(Math.min(lo, w + inc))
+    } else {
+      if (w > lo + eps && w <= hi + eps) return r2(Math.max(lo, (Math.ceil(w / step - eps) - 1) * step))
+      if (w > hi + eps) return r2(Math.max(hi, w - inc))
+    }
+  }
+  const stepped = Math.round((w + direction * inc) / inc) * inc
+  return Math.max(0, r2(stepped))
+}
+
+/** How close to failure one set goes (WP-51): the engine's effort of the exercise, read for
+ *  set `setNum`. On a "last set to failure" lift the sets before the last stop 1-2 reps short
+ *  and the last goes to failure. 'none': no effort target (a white marker). */
+export type SetEffort = 'failure' | 'close' | 'short' | 'none'
+export function setEffort(ex: Exercise, setNum: number): SetEffort {
+  switch (ex.effort) {
+    case 'failure': return 'failure'
+    case 'last_set_failure': return setNum >= (ex.sets ?? 1) ? 'failure' : 'close'
+    case 'stop_1_2': return 'close'
+    case 'stop_1_3': return 'short'
+    default: return 'none'
+  }
 }
 
 /** One band along the engine's tiers, clamped at both ends. */

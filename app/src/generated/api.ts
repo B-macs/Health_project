@@ -1577,6 +1577,19 @@ export interface components {
             /** Movable */
             movable: boolean;
         };
+        /**
+         * FineStep
+         * @description Inside from_kg..to_kg the weight moves to the next whole multiple of step;
+         *     outside it, increment_size (engine.step_weight).
+         */
+        FineStep: {
+            /** From Kg */
+            from_kg: number;
+            /** Step */
+            step: number;
+            /** To Kg */
+            to_kg: number;
+        };
         /** FlexCapture */
         FlexCapture: {
             /** Cluster */
@@ -3061,6 +3074,8 @@ export interface components {
             delta_direction: string;
             /** Duration Minutes */
             duration_minutes: number | null;
+            /** Effort */
+            effort?: ("failure" | "last_set_failure" | "stop_1_2" | "stop_1_3") | null;
             /** Entry */
             entry: {
                 [key: string]: unknown;
@@ -3071,6 +3086,7 @@ export interface components {
             equipment_type: string | null;
             /** Estimated Minutes */
             estimated_minutes: number;
+            fine_step?: components["schemas"]["FineStep"] | null;
             /** Garmin Pull */
             garmin_pull: boolean;
             /** Garmin Window */

@@ -257,6 +257,14 @@ export const S = {
     // Equipment in use (WP-27): another exercise first, the busy one straight after it.
     // Not "machine": the session screen never names a machine (Key Rule 20's test).
     inUse: 'In use? Do another first',
+    // The set marker's colour (WP-51): how close to failure the set goes.
+    effortKey: 'What the colours mean',
+    effortWords: {
+      failure: 'Red: take this set to failure. It ends when you cannot do one more rep.',
+      close: 'Amber: stop with 1-2 reps left.',
+      short: 'Green: stop with 1-3 reps left. Never to failure.',
+      none: 'White: no effort target (warm-up, stretches, holds).',
+    },
     doFirstAsk: 'Do one of these first. This exercise comes straight after it.',
     doFirst: (name: string) => `Do ${name} now`,
     keepOrder: 'Keep the order',
