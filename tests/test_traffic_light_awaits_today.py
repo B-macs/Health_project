@@ -128,13 +128,18 @@ def test_a_row_for_today_carrying_no_scored_reading_is_not_enough():
 
 @pytest.mark.parametrize("field", [
     "hrv_ms", "resting_heart_rate", "sleep_duration_hours",
-    "oura_temperature_deviation",
 ])
-def test_any_single_scored_reading_is_enough_to_judge(field):
+def test_any_single_reading_of_the_night_is_enough_to_judge(field):
     """Partial data still greys the individual metrics it is missing — that is
     pre-existing and correct. What it must NOT do is withhold the whole light,
     which would silence the engine on any night the ring recorded less than
-    everything."""
+    everything.
+
+    ⚠ Until 2026-11-23 the body temperature was one of these four, and a
+    normal temperature alone was enough to judge the day — which is how a
+    Training page read mid-sync on 2026-11-22 said "All systems nominal" on a
+    morning of HRV 16 ms. A temperature alone now counts only when it is
+    raised: section 6."""
     blanks = {k: None for k in engine._LIGHT_READING_FIELDS}
     blanks[field] = _rows()[-1][field]
     rows = _rows(last_day=TODAY, **blanks)
@@ -360,3 +365,80 @@ def test_the_headline_does_not_repeat_the_no_reading_banner():
     headline, _ = sess.coach_message(rec, plan, v.policy)
     assert headline == plan["objective"]
     assert headline != v.banner_text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  6. A temperature alone never makes a day clear (2026-11-23).
+#
+#  The athlete: "Why was yesterday training recommended with all systems
+#  normal ? even through 5 nights of worse sleep and HRV at 16 ?" The Oura
+#  sync stores the day's readiness parts (the body temperature among them)
+#  a few seconds before the night. A Training page read in that gap on
+#  2026-11-22 had a row with a normal temperature (+0.15 °C) and no HRV, heart
+#  rate or sleep; the three metrics greyed, the temperature was green, and the
+#  directive fell through to "All systems nominal. Train the session as
+#  prescribed." With the night stored a few seconds later the same day read
+#  REDUCED VOLUME on HRV 20% and sleep 12% under the average. His answer to
+#  the fix: "Yes".
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _day_row_before_the_night(temperature: float):
+    """Today's row as the store held it between the Oura sync's two writes."""
+    return _rows(last_day=TODAY, hrv_ms=None, resting_heart_rate=None,
+                 sleep_duration_hours=None, oura_temperature_deviation=temperature)
+
+
+def test_a_normal_temperature_alone_waits_for_the_night():
+    tl = engine.traffic_light(_day_row_before_the_night(0.15), for_date=TODAY)
+    assert tl["status"] == engine.STATUS_AWAITING_DATA
+    assert tl["overall"] == "grey"
+    # The night before is the most recent reading, never today's half row.
+    assert tl["latest_reading_date"] == (TODAY - timedelta(days=1)).isoformat()
+
+
+def test_a_normal_temperature_alone_is_never_all_systems_nominal():
+    rec, v = _verdict_for(_day_row_before_the_night(0.15), TODAY)
+    assert rec["label"] == "AWAITING TODAY'S READING"
+    assert rec["signal_color"] == "grey"
+    assert "nominal" not in rec["action"].lower()
+    assert v.banner_kind == "neutral"
+    from services import sessions as sess
+    plan = {"objective": "Session D — EGYM (week 5)", "phase": "12-Week Block"}
+    headline, _ = sess.coach_message(rec, plan, v.policy)
+    assert "nominal" not in headline.lower()
+    assert headline == plan["objective"]
+
+
+@pytest.mark.parametrize("temperature, light", [
+    (engine.TEMP_DEVIATION_YELLOW_C, "yellow"),
+    (engine.TEMP_DEVIATION_RED_C, "red"),
+])
+def test_a_raised_temperature_alone_still_acts(temperature, light):
+    """One-sided, as the temperature metric is: a raised temperature makes the
+    day stricter even before the night arrives."""
+    tl = engine.traffic_light(_day_row_before_the_night(temperature), for_date=TODAY)
+    assert tl["status"] == engine.STATUS_OK
+    assert tl["overall"] == light
+
+
+def test_the_full_night_arriving_judges_the_day_on_it():
+    """The same morning a few seconds later: the night is stored, and the
+    light reads it — 22 Nov's HRV 16 against an average of about 20 is
+    yellow."""
+    rows = _rows(last_day=TODAY, oura_temperature_deviation=0.15)
+    for r in rows[:-1]:
+        r["hrv_ms"] = 20.0
+    rows[-1]["hrv_ms"] = 16.0
+    tl = engine.traffic_light(rows, for_date=TODAY)
+    assert tl["status"] == engine.STATUS_OK
+    assert tl["overall"] == "yellow"
+    assert "hrv_ms" in tl["drivers"]
+
+
+def test_a_watch_only_night_is_still_judged():
+    """The fix asks for a night, not for the ring: a night the watch alone
+    recorded (heart rate and sleep, HRV held at the ring) is judged on what it
+    has."""
+    rows = _rows(last_day=TODAY, hrv_ms=None, oura_temperature_deviation=None)
+    tl = engine.traffic_light(rows, for_date=TODAY)
+    assert tl["status"] == engine.STATUS_OK

@@ -1048,15 +1048,33 @@ _LIGHT_READING_FIELDS = (
     "oura_temperature_deviation",
 )
 
+#: The readings of the NIGHT. A row needs one of them before the light may call
+#: the day clear (2026-11-23). On 2026-11-22 the Oura sync stored the day's
+#: readiness parts (body temperature +0.15 °C) a few seconds before the night,
+#: and a Training page read in that gap said "All systems nominal. Train the
+#: session as prescribed." on a morning of HRV 16 ms (20% under the average)
+#: and 6.1 h of sleep (12% under): a normal temperature alone made the day
+#: green. The athlete, asked whether to fix it: "Yes".
+_NIGHT_READING_FIELDS = ("hrv_ms", "resting_heart_rate", "sleep_duration_hours")
+
+
+def _row_has_a_reading(row: dict) -> bool:
+    """True when `row` holds a reading of the night, or a body temperature that
+    is itself raised. A temperature alone can make a day stricter, never clear:
+    one-sided, as the temperature metric already is (_temperature_signal)."""
+    if any(row.get(k) is not None for k in _NIGHT_READING_FIELDS):
+        return True
+    return _temperature_signal(row.get("oura_temperature_deviation")) in ("yellow", "red")
+
 
 def _row_can_be_judged(row: dict | None, for_date) -> bool:
-    """True when `row` is for_date's own row AND carries at least one reading
-    the light scores."""
+    """True when `row` is for_date's own row AND carries a reading the light
+    may judge the day on (_row_has_a_reading)."""
     if not row:
         return False
     if str(row.get("date") or "") != str(for_date):
         return False
-    return any(row.get(k) is not None for k in _LIGHT_READING_FIELDS)
+    return _row_has_a_reading(row)
 
 
 def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = None,
@@ -1093,8 +1111,9 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
                         callers therefore see no behaviour change.
 
         for_date:       the day being judged. When given, the newest row must
-                        BE that day's row and must carry at least one scored
-                        reading, or the light returns grey with status
+                        BE that day's row and must carry a reading of the night
+                        (HRV, resting heart rate or sleep) or a raised body
+                        temperature, or the light returns grey with status
                         "awaiting_data" rather than grading an older night as
                         if it were this one. None (the default) keeps the
                         historical behaviour of treating the last row as today.
@@ -1147,8 +1166,7 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
         # contradiction of its own.
         latest = next(
             (str(r.get("date")) for r in reversed(biometric_rows)
-             if any(r.get(k) is not None for k in _LIGHT_READING_FIELDS)
-             and r.get("date")),
+             if _row_has_a_reading(r) and r.get("date")),
             None,
         )
         if latest == str(for_date):
