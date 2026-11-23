@@ -7,6 +7,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import fixture from '../../dev/session_fixture.json'
+import dailyFixture from '../../dev/daily_fixture.json'
 import { HealthDB } from '../db/schema'
 import { holdLengthMs, startTimer } from '../lib/timers'
 import { AppStateProvider } from '../lib/appState'
@@ -202,6 +203,40 @@ describe('the set marker shows the effort (WP-51)', () => {
     const html = render(at(0))
     expect(html).toMatch(/tracker__chip--now"[^>]*data-effort="none"/)
     expect(html).not.toContain('data-testid="effort-key"')
+  })
+})
+
+/** The class of the button with this test id, in a rendered screen. */
+function buttonClass(html: string, testId: string): string | undefined {
+  return html.match(new RegExp(`<button class="([^"]*)"[^>]*data-testid="${testId}"`))?.[1]
+}
+
+describe('the daily tendon session: Start is the main button until the hold runs (2026-11-23)', () => {
+  // The owner: "the Start timer button should be in white background while the skip should
+  // have the black. this makes more sense". "Set done" before the hold skips the timer.
+  const daily = dailyFixture as unknown as Plan
+  const first = startSessionState(daily, '2026-11-23-0a1b2c3d', daily.exercises.map((_, i) => `d-${i}`))
+
+  it('before the hold: Start the hold is the main button, and Set done is the plain one', () => {
+    const html = render(first)
+    expect(buttonClass(html, 'start-hold')).toContain('btn--primary')
+    expect(buttonClass(html, 'set-done')).toContain('btn--glass')
+    expect(html.match(/btn--primary/g)).toHaveLength(1)
+  })
+
+  it('once the hold runs, Set done is the main button again', () => {
+    const ex = daily.exercises[first.plan.steps[first.step].ex_idx]
+    const html = render(withTimer(first, startTimer('hold', holdLengthMs(ex), Date.now())))
+    expect(html).not.toContain('data-testid="start-hold"')
+    expect(buttonClass(html, 'set-done')).toContain('btn--primary')
+  })
+
+  it('a gym session keeps Set done as the main button before a hold', () => {
+    const hold = plan.exercises.findIndex((e) => e.timer === 'hold')
+    expect(hold).toBeGreaterThanOrEqual(0)
+    const html = render(at(firstEntry(hold)))
+    expect(buttonClass(html, 'start-hold')).toContain('btn--glass')
+    expect(buttonClass(html, 'set-done')).toContain('btn--primary')
   })
 })
 

@@ -106,7 +106,7 @@ export async function tapToSave(page: Page): Promise<void> {
     if (now === 'save') return
     const seconds = page.getByRole('spinbutton')
     if (await seconds.count()) await seconds.fill('30')
-    await page.locator('.controls .btn--primary').click()
+    await page.getByTestId('set-done').click()
     await expect.poll(at).not.toBe(now)
   }
   throw new Error('the session never reached the save screen')

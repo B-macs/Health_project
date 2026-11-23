@@ -52,7 +52,7 @@ async function tap(page: Page): Promise<void> {
   const at = await position(page)
   const seconds = page.getByRole('spinbutton')
   if (await seconds.count()) await seconds.fill('30')
-  await page.locator('.controls .btn--primary').click()
+  await page.getByTestId('set-done').click()
   await expect.poll(() => position(page)).not.toBe(at)
 }
 

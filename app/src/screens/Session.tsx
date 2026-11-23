@@ -562,6 +562,11 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
       : ex.type === 'hold_reps' && step.record_set == null && !isFirstSide ? S.session.repDone(step.rep)
         : isFirstSide ? S.session.sideDone(step.side)
           : S.session.setDone(step.set_num)
+  // The daily tendon session (the owner, 2026-11-23: "the Start timer button should be in
+  // white background while the skip should have the black. this makes more sense"): until a
+  // hold starts, "Start the hold" is the main button and "Set done", which would skip the
+  // timer, is the plain one. Once the timer runs, "Set done" is the main button again.
+  const startLeads = s.plan.kind === 'daily' && !t && !resting && ex.timer === 'hold'
 
   const start = (timer: Timer) => {
     unlockAudio()
@@ -751,7 +756,8 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
           </button>
         )}
         {!t && ex.timer === 'hold' && !resting && (
-          <button className="btn btn--glass btn--gym" onClick={() => start(startTimer('hold', holdLengthMs(ex), Date.now()))}>
+          <button className={`btn ${startLeads ? 'btn--primary' : 'btn--glass'} btn--gym`} data-testid="start-hold"
+            onClick={() => start(startTimer('hold', holdLengthMs(ex), Date.now()))}>
             <IconPlay /> {S.session.startHold}
           </button>
         )}
@@ -787,7 +793,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
         {resting && t && !ended && (
           <button className="btn btn--glass btn--gym" onClick={() => update((x) => withTimer(x, extendTimer(t, 15_000)))}>{S.session.plus15}</button>
         )}
-        <button className="btn btn--primary btn--gym"
+        <button className={`btn ${startLeads ? 'btn--glass' : 'btn--primary'} btn--gym`} data-testid="set-done"
           disabled={pulling || (ex.timer === 'stopwatch' && !resting && typed == null)
             || (!!ex.tonnage_entry && !resting && tonnage == null)
             || (!!ex.reading && !resting && !readingComplete(s, ex))}
