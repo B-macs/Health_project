@@ -211,9 +211,10 @@ function buttonClass(html: string, testId: string): string | undefined {
   return html.match(new RegExp(`<button class="([^"]*)"[^>]*data-testid="${testId}"`))?.[1]
 }
 
-describe('the daily tendon session: Start is the main button until the hold runs (2026-11-23)', () => {
-  // The owner: "the Start timer button should be in white background while the skip should
-  // have the black. this makes more sense". "Set done" before the hold skips the timer.
+describe('Start is the main button until the timer runs, in every session (2026-11-23)', () => {
+  // The owner, of the daily tendon session: "the Start timer button should be in white
+  // background while the skip should have the black. this makes more sense"; then "Yes, gym
+  // too". "Set done" before the timer skips it.
   const daily = dailyFixture as unknown as Plan
   const first = startSessionState(daily, '2026-11-23-0a1b2c3d', daily.exercises.map((_, i) => `d-${i}`))
 
@@ -231,11 +232,42 @@ describe('the daily tendon session: Start is the main button until the hold runs
     expect(buttonClass(html, 'set-done')).toContain('btn--primary')
   })
 
-  it('a gym session keeps Set done as the main button before a hold', () => {
+  it('a gym hold: Start the hold is the main button before it runs, Set done after', () => {
     const hold = plan.exercises.findIndex((e) => e.timer === 'hold')
     expect(hold).toBeGreaterThanOrEqual(0)
-    const html = render(at(firstEntry(hold)))
-    expect(buttonClass(html, 'start-hold')).toContain('btn--glass')
+    const s = at(firstEntry(hold))
+    const html = render(s)
+    expect(buttonClass(html, 'start-hold')).toContain('btn--primary')
+    expect(buttonClass(html, 'set-done')).toContain('btn--glass')
+    expect(html.match(/btn--primary/g)).toHaveLength(1)
+    const running = render(withTimer(s, startTimer('hold', holdLengthMs(plan.exercises[hold]), Date.now())))
+    expect(buttonClass(running, 'set-done')).toContain('btn--primary')
+  })
+
+  it('the stopwatch of a timed test: Start is the main button before it runs', () => {
+    const watch = plan.exercises.findIndex((e) => e.timer === 'stopwatch')
+    expect(watch).toBeGreaterThanOrEqual(0)
+    const html = render(at(firstEntry(watch)))
+    expect(buttonClass(html, 'start-watch')).toContain('btn--primary')
+    expect(buttonClass(html, 'set-done')).toContain('btn--glass')
+  })
+
+  it('a timed piece: Start is the main button; a walk the watch records keeps Done as the main button', () => {
+    const walk = plan.exercises.findIndex((e) => e.timer === 'duration')
+    expect(plan.exercises[walk].garmin_pull).toBe(true)
+    const watched = render(at(firstEntry(walk)))
+    expect(watched).not.toContain('data-testid="start-timer"')
+    expect(buttonClass(watched, 'set-done')).toContain('btn--primary')
+    const timed = { ...plan, exercises: plan.exercises.map((e, i) => (i === walk ? { ...e, garmin_pull: false } : e)) }
+    const html = render({ ...startSessionState(timed, '2026-10-20-0a1b2c3d', timed.exercises.map((_, i) => `ex-${i}`)), step: firstEntry(walk) })
+    expect(buttonClass(html, 'start-timer')).toContain('btn--primary')
+    expect(buttonClass(html, 'set-done')).toContain('btn--glass')
+  })
+
+  it('a rest: no Start, and Next set is the main button', () => {
+    const rest = plan.steps.findIndex((st) => st.phase === 'resting')
+    const html = render(at(rest))
+    expect(html).not.toMatch(/data-testid="start-(hold|timer|watch)"/)
     expect(buttonClass(html, 'set-done')).toContain('btn--primary')
   })
 })

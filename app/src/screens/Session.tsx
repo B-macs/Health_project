@@ -562,11 +562,15 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
       : ex.type === 'hold_reps' && step.record_set == null && !isFirstSide ? S.session.repDone(step.rep)
         : isFirstSide ? S.session.sideDone(step.side)
           : S.session.setDone(step.set_num)
-  // The daily tendon session (the owner, 2026-11-23: "the Start timer button should be in
-  // white background while the skip should have the black. this makes more sense"): until a
-  // hold starts, "Start the hold" is the main button and "Set done", which would skip the
-  // timer, is the plain one. Once the timer runs, "Set done" is the main button again.
-  const startLeads = s.plan.kind === 'daily' && !t && !resting && ex.timer === 'hold'
+  // Every session's timers (the owner, 2026-11-23, of the daily tendon session: "the Start
+  // timer button should be in white background while the skip should have the black. this
+  // makes more sense"; then "Yes, gym too"): until a hold, a timed piece or the stopwatch
+  // starts, its Start button is the main button and "Set done", which would skip the timer,
+  // is the plain one. Once the timer runs, "Set done" is the main button again. A walk the
+  // watch records has no Start button, so "Done" stays the main button there.
+  const startLeads = !t && !resting && (ex.timer === 'hold' || ex.timer === 'stopwatch'
+    || (ex.timer === 'duration' && !ex.garmin_pull))
+  const startClass = `btn ${startLeads ? 'btn--primary' : 'btn--glass'} btn--gym`
 
   const start = (timer: Timer) => {
     unlockAudio()
@@ -756,18 +760,20 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
           </button>
         )}
         {!t && ex.timer === 'hold' && !resting && (
-          <button className={`btn ${startLeads ? 'btn--primary' : 'btn--glass'} btn--gym`} data-testid="start-hold"
+          <button className={startClass} data-testid="start-hold"
             onClick={() => start(startTimer('hold', holdLengthMs(ex), Date.now()))}>
             <IconPlay /> {S.session.startHold}
           </button>
         )}
         {!t && ex.timer === 'duration' && !ex.garmin_pull && !resting && (
-          <button className="btn btn--glass btn--gym" onClick={() => start(startTimer('duration', (ex.duration_minutes ?? 0) * 60_000, Date.now()))}>
+          <button className={startClass} data-testid="start-timer"
+            onClick={() => start(startTimer('duration', (ex.duration_minutes ?? 0) * 60_000, Date.now()))}>
             <IconPlay /> {S.session.startTimer(ex.duration_minutes ?? 0)}
           </button>
         )}
         {!t && ex.timer === 'stopwatch' && !resting && (
-          <button className="btn btn--glass btn--gym" onClick={() => start(startTimer('stopwatch', 0, Date.now()))}>
+          <button className={startClass} data-testid="start-watch"
+            onClick={() => start(startTimer('stopwatch', 0, Date.now()))}>
             <IconPlay /> {S.session.startWatch}
           </button>
         )}
