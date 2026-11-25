@@ -21,7 +21,7 @@ from dataclasses import asdict
 from datetime import date
 from typing import Callable
 
-from services import engine, hrv_trend, readiness, verdict, week_repeat
+from services import engine, hrv_trend, readiness, sleep_score, verdict, week_repeat
 from services import plan as _plan
 from services import sessions as _sess
 
@@ -58,7 +58,8 @@ def engine_state(repo, day: date, *, with_stage_status: bool = False) -> dict:
     stage = repo.get_current_stage()
     streak = repo.get_pain_free_streak(today=day)
     lam = float(diag.get("injury_weight_decay_lambda") or 0.05)
-    tl = engine.traffic_light(bio, drift_rows=drift, for_date=day)
+    tl = engine.traffic_light(bio, drift_rows=drift, for_date=day,
+                              sleep_scores=run_sleep_scores(repo, drift, day))
     # `today=day`: the ratio's window ends on the day asked for, never on the server's own
     # clock (rebuild rule 3; it read the clock until 2026-10-21, found when the made-up
     # Insights data drifted by a day overnight).
@@ -129,6 +130,38 @@ def ring_hrv_series(repo, day: date) -> dict:
     return {date.fromisoformat(k): v for k, v in raw["oura"].items()}
 
 
+def run_sleep_scores(repo, rows: list[dict], day: date) -> dict[str, float] | None:
+    """Our Sleep Score for each night the run of poor nights reads
+    (engine.poor_sleep_run, 2026-11-25): the last POOR_RUN_NIGHTS nights up to
+    `day` and the 28 rows before each, computed as Home computes the score
+    (services.sleep_score with the night's effective wake-time correction).
+
+    ⚠ ITS OWN try/except, as hrv_note's is: a failure here leaves the run out
+    (None), the light it was before the run existed, and never takes the
+    directive down. A failed read of the corrections scores Oura's own nights,
+    as Home does on the same failure."""
+    try:
+        need = engine.POOR_RUN_NIGHTS + engine.POOR_RUN_BASELINE_ROWS
+        nights = [str(r.get("date")) for r in rows
+                  if r.get("date") and str(r.get("date")) <= day.isoformat()][-need:]
+        if not nights:
+            return None
+        try:
+            adjustments, _sources = repo.get_effective_wake_adjustments(
+                start=nights[0], end=day.isoformat())
+        except Exception:
+            adjustments = None
+        scores: dict[str, float] = {}
+        for night in nights:
+            score = sleep_score.compute_sleep_score(
+                date.fromisoformat(night), rows, wake_time_adjustments=adjustments)
+            if score != sleep_score.NOT_COMPUTED:
+                scores[night] = float(score)
+        return scores or None
+    except Exception:
+        return None
+
+
 def hrv_note(directive_: dict | None, day: date, read_series: Callable[[], dict]) -> str:
     """The ring's downward-run sentence, or "".
 
@@ -141,10 +174,12 @@ def hrv_note(directive_: dict | None, day: date, read_series: Callable[[], dict]
 
     SUPPRESSED when the traffic light already names HRV as what it acted on:
     otherwise a day HRV drives the light yellow shows two warnings about one
-    reading. Same rule engine.acwr_advisory_note already applies."""
+    reading. Same rule engine.acwr_advisory_note already applies. The same
+    holds when the run of poor nights decided the day: its reason already
+    names the HRV (engine.POOR_RUN_REASON)."""
     try:
         drivers = (directive_ or {}).get("_traffic_drivers") or ()
-        if "hrv_ms" in drivers:
+        if "hrv_ms" in drivers or engine.POOR_SLEEP_RUN in drivers:
             return ""
         return hrv_trend.ring_run_advisory(read_series(), day) or ""
     except Exception:

@@ -1077,8 +1077,96 @@ def _row_can_be_judged(row: dict | None, for_date) -> bool:
     return _row_has_a_reading(row)
 
 
+# ── A run of poor nights ends in rest (2026-11-25) ──────────────────────────
+# The athlete, of 22 Nov (HRV 16 ms after five nights of poorer sleep): "Poor
+# run of nights should also contribute, for me 5 nights of reduced sleep and
+# then HRV drop and sleep drop two days in a row at the end of a 5 night sleep
+# drop. that should be rest." To which measure of "reduced sleep": "Yes, build
+# it" (our Sleep Score), and to the morning after a rest: "A" (one good night
+# ends the run; the day is judged on that night alone).
+#
+# MEASURED BEFORE IT WAS BUILT, on his 138 nights with HRV and sleep from
+# 2026-07-01 to 11-23: only OUR Sleep Score under its own 28-day average made
+# 18-22 Nov five reduced nights (72.3, 72.0, 63.8, 61.4, 60.6 against about
+# 73-74). Sleep time under its average, 5% under, Oura's own sleep score and
+# the sleep need did not: the sleep time was 7.2, 6.9, 7.1, 6.1, 6.1 h against
+# 6.9. With this rule, rest falls on one day of the 138, 22 Nov.
+#
+# Each night is judged against ITS OWN 28-day average (the 28 rows ending on
+# it, the light's own baseline), never against the judged day's: the judged
+# day's average already holds the poor nights, and on 18 Nov (72.3 against its
+# own 73.9) that would read the first night as normal. A night with no Sleep
+# Score (the ring not worn) or a missing day breaks the run: a night that was
+# not measured is not a poor night. One-directional, as the drift guard is: it
+# can only make the day stricter, never clearer.
+POOR_RUN_NIGHTS = 5            # nights in a row with the Sleep Score under its average
+POOR_RUN_LAST_DOWN = 2         # the last nights with HRV AND sleep time both down
+POOR_RUN_BASELINE_ROWS = 28    # each night against the 28 rows ending on it
+POOR_RUN_MIN_BASELINE_ROWS = 14  # fewer rows than this and a night's average is not trusted
+#: The driver the light names when the run decided the day.
+POOR_SLEEP_RUN = "poor_sleep_run"
+
+_NUMBER_WORDS = {2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven"}
+
+#: The reason, in his words of the rule (the banner's cause on a rest day).
+POOR_RUN_REASON = (
+    f"Your Sleep Score was under your 28-day average "
+    f"{_NUMBER_WORDS[POOR_RUN_NIGHTS]} nights in a row, and your HRV and sleep time "
+    f"were both more than {round(YELLOW_THRESHOLD * 100)}% under their averages "
+    f"the last {_NUMBER_WORDS[POOR_RUN_LAST_DOWN]} nights"
+)
+
+
+def poor_sleep_run(rows: list[dict], sleep_scores: dict[str, float] | None,
+                   for_date) -> dict:
+    """Does a run of poor nights end on `for_date`?
+
+    rows: the biometric rows sorted ascending (hrv_ms, sleep_duration_hours),
+    long enough for each of the last POOR_RUN_NIGHTS nights to have its own
+    28-row average. sleep_scores: {ISO date: our Sleep Score} for those nights;
+    a night missing from it has no score.
+
+    It fires when the last POOR_RUN_NIGHTS calendar nights, ending on
+    for_date, each have a Sleep Score under their own 28-day average, and the
+    last POOR_RUN_LAST_DOWN of them each have HRV AND sleep time more than
+    YELLOW_THRESHOLD under their own averages (the reduced-load line).
+
+    Returns {"fires": bool, "nights": [ISO dates of the run, oldest first]};
+    "nights" is empty when it does not fire."""
+    quiet = {"fires": False, "nights": []}
+    if not sleep_scores or not rows:
+        return quiet
+    day = str(for_date)
+    end = next((i for i in range(len(rows) - 1, -1, -1)
+                if str(rows[i].get("date") or "") == day), None)
+    if end is None or end < POOR_RUN_NIGHTS - 1:
+        return quiet
+    first = date.fromisoformat(day) - timedelta(days=POOR_RUN_NIGHTS - 1)
+    nights: list[str] = []
+    for n in range(POOR_RUN_NIGHTS):
+        i = end - POOR_RUN_NIGHTS + 1 + n
+        night = str(rows[i].get("date") or "")
+        if night != (first + timedelta(days=n)).isoformat():
+            return quiet                       # a missing day breaks the run
+        window = rows[max(0, i - POOR_RUN_BASELINE_ROWS + 1): i + 1]
+        if len(window) < POOR_RUN_MIN_BASELINE_ROWS:
+            return quiet
+        scores = [sleep_scores[str(r.get("date"))] for r in window
+                  if sleep_scores.get(str(r.get("date"))) is not None]
+        score = sleep_scores.get(night)
+        if score is None or not scores or not score < sum(scores) / len(scores):
+            return quiet
+        if n >= POOR_RUN_NIGHTS - POOR_RUN_LAST_DOWN:
+            for key in ("hrv_ms", "sleep_duration_hours"):
+                value, base = rows[i].get(key), _safe_avg(window, key)
+                if value is None or not base or not value < base * (1 - YELLOW_THRESHOLD):
+                    return quiet
+        nights.append(night)
+    return {"fires": True, "nights": nights}
+
+
 def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = None,
-                  for_date=None) -> dict:
+                  for_date=None, sleep_scores: dict[str, float] | None = None) -> dict:
     """
     Evaluate daily biometrics against rolling baselines.
 
@@ -1119,6 +1207,12 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
                         historical behaviour of treating the last row as today.
                         See _row_can_be_judged.
 
+        sleep_scores:   {ISO date: our Sleep Score} for the nights the run of
+                        poor nights reads (poor_sleep_run): the last
+                        POOR_RUN_NIGHTS and the 28 rows before each. None (the
+                        default) leaves the run out, so every caller that does
+                        not pass it sees the light it saw before 2026-11-25.
+
     Returns dict with keys:
         overall         : "green" | "yellow" | "red" | "grey"
         status          : "ok" | "insufficient_data" | "awaiting_data"
@@ -1126,6 +1220,8 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
         metrics         : dict per metric with value/baseline/signal/delta_pct
         drift           : baseline_drift() result (see that function)
         drift_applied   : bool — True when drift actually downgraded `overall`
+        poor_sleep_run  : poor_sleep_run()'s answer ({"fires", "nights"})
+        poor_sleep_run_applied : bool — True when the run made the day red
         drivers         : list[str] — metric keys sitting AT `overall`, i.e.
                           the reading(s) that decided the light. Empty on a
                           green or grey day, and on a drift-downgraded one
@@ -1257,6 +1353,17 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
     if drift_applied:
         overall = "yellow"
 
+    # A run of poor nights ends in rest (poor_sleep_run) — strictly
+    # one-directional too: it only ever makes the day red. The run reads the
+    # longer history when it is given, because each of its nights needs its
+    # own 28-row average.
+    run = poor_sleep_run(drift_rows if drift_rows is not None else biometric_rows,
+                         sleep_scores,
+                         for_date if for_date is not None else today.get("date"))
+    run_applied = run["fires"] and overall != "red"
+    if run["fires"]:
+        overall = "red"
+
     vol_mult = {"green": 1.0, "yellow": 0.75, "red": 0.0, "grey": 1.0}[overall]
 
     messages = {
@@ -1292,6 +1399,12 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
     driver_summary = "; ".join(
         r for r in (metric_reason(k, metrics[k]) for k in drivers) if r
     )
+    # The run is named first whenever it fired: it is the reason for the rest
+    # even on a day a reading alone was already red.
+    if run["fires"]:
+        drivers = [POOR_SLEEP_RUN] + drivers
+        driver_summary = "; ".join(r for r in (POOR_RUN_REASON, driver_summary) if r)
+        message = f"{POOR_RUN_REASON}. Rest or mobility only."
     # A drift downgrade has no metric behind it by construction — it fires only
     # when every reading is green and the BASELINE itself has moved — so the
     # drift message is the honest attribution for that day.
@@ -1305,6 +1418,10 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
         "metrics":  metrics,
         "drift":    drift,
         "drift_applied": drift_applied,
+        # The run of poor nights (poor_sleep_run): its answer, and whether it
+        # made the day red that would not have been red without it.
+        "poor_sleep_run": run,
+        "poor_sleep_run_applied": run_applied,
         "drivers":  drivers,
         "driver_summary": driver_summary,
         "data_days": len(biometric_rows),
