@@ -8,7 +8,9 @@ on a name that does not resolve.
 
 A PRESCRIPTION WITHOUT A PATTERN IS A GUESS. `prescribe(None)` refuses, as
 Cluster A's does. Until the front split test has been taken, the evening
-session keeps the last stack that was measured (goal_block.evening_mobility_day).
+session runs the stack for the expected result, H (goal_block.
+EVENING_PATTERN_BEFORE_TEST, his choice of 2026-11-25); the pattern is named
+there, never guessed here.
 
 HOW EVERY STACK IS BUILT (the blueprint's Part 6, and its adaptation for him)
 ------------------------------------------------------------------------------

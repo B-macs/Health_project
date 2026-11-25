@@ -461,9 +461,10 @@ def test_a_strength_day_before_a_rest_day_offers_the_evening_mobility_session(en
     the evening ... on the days I have no strength training the next day ...
     The mobility training will replace the tendon training on those days."
     Tuesday (B) is before Wednesday's rest: the second tile's address answers
-    with the Sunday stack, no 8-hour line and the plan's own time model. With
-    no front split test taken yet (the goal from 2026-11-11), the stack is the
-    last one a test prescribed and the note asks for the front split test.
+    with no 8-hour line and the plan's own time model. With no front split
+    test taken yet (the goal from 2026-11-11), the stack is the front split
+    stack for the expected result, the front leg (his choice of 2026-11-25),
+    and the note asks for the front split test.
     Only with Monday trained (2026-11-18: "mobility only when there is a rest
     day the next day after the two days of training"): without it, the tendon
     session."""
@@ -472,10 +473,10 @@ def test_a_strength_day_before_a_rest_day_offers_the_evening_mobility_session(en
     _log_plan_session(env, monkeypatch, MONDAY)
     plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
     assert plan["kind"] == "mobility" and plan["plan_days"] is None
-    assert [e["name"] for e in plan["exercises"]] == [e["name"] for e in gb.FLEX_STACK]
+    assert [e["name"] for e in plan["exercises"]] == [e["name"] for e in gb.FRONT_SPLIT_STACKS["H"]]
     assert (plan["reminder"] is None and plan["done_today"] is False
             and plan["note"] == mob.NOTE_BEFORE_TEST)
-    assert plan["steps"] and 20 <= plan["model_minutes"] <= 30
+    assert plan["steps"] and 15 <= plan["model_minutes"] <= 30
     assert plan["ask_length_above_minutes"] == sess.DURATION_CHECK_RATIO * plan["model_minutes"]
     # Monday (A) is before Tuesday's strength: the daily tendon session.
     assert env.ok(monkeypatch, "get", "/api/training/daily")["kind"] == "daily"
@@ -484,30 +485,34 @@ def test_a_strength_day_before_a_rest_day_offers_the_evening_mobility_session(en
 def test_after_the_front_split_test_the_evening_runs_its_stack(env, monkeypatch):
     """The athlete, 2026-11-11: "I want to change the mobility plan from the
     pancake to the front split as the objective", then "Yes, all four". The
-    front split test is taken on Insights › Flexibility; when it reads the front
-    leg short (pattern H), the evening session is the front split stack for H,
-    and the note is the evening's own."""
+    front split test is taken on Insights › Flexibility; when it reads the back
+    leg's deep hip flexors short (pattern P), the evening session is the front
+    split stack for P, not the front-leg stack it runs before the test (his
+    choice of 2026-11-25), and the note is the evening's own."""
     from services import mobility_session as mob
+    _log_plan_session(env, monkeypatch, MONDAY)      # the evening needs Monday trained
+    before = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
+    assert [e["name"] for e in before["exercises"]] == [
+        e["name"] for e in gb.FRONT_SPLIT_STACKS["H"]]
     state = env.ok(monkeypatch, "post", "/api/insights/flexibility/capture",
                    body={"cold": True}, local=MONDAY)
     assert [t["key"] for t in state["order"]] == list(fsb.TEST_ORDER)
-    readings = {"slr_active": 60.0, "slr_passive": 70.0, "hanging_thigh": 5.0,
+    readings = {"slr_active": 85.0, "slr_passive": 95.0, "hanging_thigh": -5.0,
                 "hanging_shin": 5.0, "split_span": 120.0}
     for key in fsb.TEST_ORDER:
         state = env.ok(monkeypatch, "put", "/api/insights/flexibility/capture", body={
             "test_key": key, "entered": {"left": readings[key], "right": readings[key]},
             "setup_value": 85.0 if key == "split_span" else None}, local=MONDAY)
-    assert state["early_pattern"] == "H"
+    assert state["early_pattern"] == "P"
     report = env.ok(monkeypatch, "post", "/api/insights/flexibility/capture/finish",
                     local=MONDAY)["report"]
-    assert report["pattern"] == "H" and report["cluster_label"] == "Front split"
+    assert report["pattern"] == "P" and report["cluster_label"] == "Front split"
     assert [i["exercise"] for i in report["stack"]["items"]] == [
-        i.exercise for i in fsr.prescribe("H").live_items]
-    _log_plan_session(env, monkeypatch, MONDAY)      # the evening needs Monday trained
+        i.exercise for i in fsr.prescribe("P").live_items]
     plan = env.ok(monkeypatch, "get", "/api/training/daily", local=TUESDAY)
     assert plan["kind"] == "mobility" and plan["note"] == mob.NOTE
     assert [e["name"] for e in plan["exercises"]] == [
-        e["name"] for e in gb.FRONT_SPLIT_STACKS["H"]]
+        e["name"] for e in gb.FRONT_SPLIT_STACKS["P"]]
 
 
 def test_the_tile_follows_the_day_picked_in_the_strip(env, monkeypatch):
@@ -556,7 +561,7 @@ def test_tonights_evening_mobility_swaps_with_another_day_of_its_week(env, monke
                       body=body) == {"stored": True}
     assert _tile(env, monkeypatch, TUESDAY, TUESDAY)["kind"] == "daily"
     thu = _tile(env, monkeypatch, thursday, TUESDAY)
-    assert thu["kind"] == "mobility" and thu["exercises"][0]["name"] == gb.FLEX_STACK[0]["name"]
+    assert thu["kind"] == "mobility" and thu["exercises"][0]["name"] == gb.FRONT_SPLIT_STACKS["H"][0]["name"]
     assert _tile(env, monkeypatch, friday, TUESDAY)["kind"] == "mobility", "the week keeps two"
     env.ok(monkeypatch, "post", "/api/training/daily/swap", local=TUESDAY, body={
         "date": thursday.isoformat(), "to": TUESDAY.isoformat(), "action_id": "evening-swap-2"})

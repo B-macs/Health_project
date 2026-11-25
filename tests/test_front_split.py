@@ -305,15 +305,25 @@ class _Repo:
         return self._a
 
 
-def test_before_the_first_test_the_evening_keeps_the_last_measured_stack():
+def test_before_the_first_test_the_evening_runs_the_expected_front_split_stack():
+    """The athlete, 2026-11-25: "The evening mobility still looks like it
+    working towards pancake and not front split ?", then "Yes, switch it":
+    before the first front split test the evening runs the stack for the
+    expected result (the front leg), no longer Cluster A's pattern D."""
     assert mob.front_split_pattern(_Repo(), TODAY) is None
+    assert gb.EVENING_PATTERN_BEFORE_TEST == fb.EXPECTED_PATTERN == "H"
     day = mob.build_day(None)
-    assert [e["name"] for e in day["exercises"]] == [e["name"] for e in gb.FLEX_STACK]
-    assert mob.note(None) == mob.NOTE_BEFORE_TEST and "front split" in mob.NOTE_BEFORE_TEST
+    assert [e["name"] for e in day["exercises"]] == [e["name"] for e in gb.FRONT_SPLIT_STACKS["H"]]
+    assert not {e["name"] for e in day["exercises"]} & {e["name"] for e in gb.FLEX_STACK}
+    assert day["objective"] == "Evening mobility — Front split: Front leg — hamstrings"
+    assert mob.note(None) == mob.NOTE_BEFORE_TEST and "front split test" in mob.NOTE_BEFORE_TEST
+    with pytest.raises(fp.NoPatternError):
+        fp.prescribe(None)
 
 
-def test_an_unreadable_store_runs_the_last_stack_never_a_guess():
+def test_an_unreadable_store_runs_the_expected_stack():
     assert mob.front_split_pattern(_Repo(broken=True), TODAY) is None
+    assert mob.build_day(None)["exercises"] == mob.build_day("H")["exercises"]
 
 
 def test_after_the_test_the_evening_runs_the_stack_for_its_pattern():

@@ -59,6 +59,7 @@ import cluster_a_battery as _battery
 import cluster_a_mechanics as _mech
 import cluster_a_prescription as _rx
 import egym_circuit as _egym
+import front_split_battery as _fs_battery
 import front_split_mechanics as _fs_mech
 import front_split_prescription as _fs_rx
 from training_plan import _ex as _plan_ex
@@ -1083,23 +1084,28 @@ def _flexibility_day(week: int) -> dict:
     }
 
 
+#: The evening's stack before the first front split test: the stack for the
+#: result his record points to (front_split_battery.EXPECTED_PATTERN, the front
+#: leg). The athlete, 2026-11-25, of the side split stack the evening still ran:
+#: "The evening mobility still looks like it working towards pancake and not
+#: front split ?", then, asked whether it should run this stack until the test,
+#: "Yes, switch it". From 2026-11-11 to then it was Cluster A's pattern D.
+EVENING_PATTERN_BEFORE_TEST: str = _fs_battery.EXPECTED_PATTERN
+
+
 def evening_mobility_day(front_split_pattern: str | None = None) -> dict:
     """The evening mobility session from week 4 (EVENING_MOBILITY_FROM_WEEK).
     Not a plan day: services/mobility_session.py offers it on the evening of a
     strength day and stores it under its own Type.
 
     The flexibility goal is the front split from 2026-11-11, and the session is
-    the front split stack for the pattern of his latest front split test. Before
-    that test it is the last stack a test prescribed, Cluster A's pattern D: a
-    front split stack with no pattern would be a guess (front_split_
-    prescription.prescribe refuses one)."""
-    if front_split_pattern:
-        stack = _fs_rx.prescribe(front_split_pattern)
-        objective = f"Evening mobility — Front split: {stack.limiter}"
-        exercises = list(FRONT_SPLIT_STACKS[stack.pattern])
-    else:
-        objective = "Evening mobility — Adductors and Hip Rotators"
-        exercises = list(FLEX_STACK)
+    the front split stack for the pattern of his latest front split test; before
+    that test, the stack for the expected result (EVENING_PATTERN_BEFORE_TEST),
+    his choice of 2026-11-25. front_split_prescription.prescribe still refuses a
+    missing pattern: the expected one is named here, never guessed there."""
+    stack = _fs_rx.prescribe(front_split_pattern or EVENING_PATTERN_BEFORE_TEST)
+    objective = f"Evening mobility — Front split: {stack.limiter}"
+    exercises = list(FRONT_SPLIT_STACKS[stack.pattern])
     return {
         "objective": objective,
         "phase": BLOCK_NAME,

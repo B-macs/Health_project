@@ -186,9 +186,12 @@ def test_no_block_no_evening_and_the_blocks_last_strength_day_has_one():
     assert last_friday.weekday() == 4 and mob.is_due(_phases(), last_friday)
 
 
-def test_the_session_is_the_sunday_stack_and_this_module_defines_no_exercise():
+def test_the_session_is_the_front_split_stack_and_this_module_defines_no_exercise():
+    """Before the first front split test, the stack for the expected result
+    (his choice of 2026-11-25; it was the Sunday stack, pattern D, before)."""
     day = mob.build_day()
-    assert [e["name"] for e in day["exercises"]] == [e["name"] for e in gb.FLEX_STACK]
+    assert [e["name"] for e in day["exercises"]] == [
+        e["name"] for e in gb.FRONT_SPLIT_STACKS[gb.EVENING_PATTERN_BEFORE_TEST]]
     assert day["is_gym_session"] is False and day["session_kind"] == "flexibility"
     assert not sess.session_shape_violations(day)
     tree = ast.parse((ROOT / "services" / "mobility_session.py").read_text(encoding="utf-8"))
