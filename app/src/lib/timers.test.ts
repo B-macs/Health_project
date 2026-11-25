@@ -3,8 +3,8 @@
 // error over one second after a simulated background is a failure here.
 import { describe, expect, it } from 'vitest'
 import {
-  elapsedMs, endsAt, extendTimer, hasEnded, holdLengthMs, leadInLeftMs, pauseTimer, remainingMs, resumeTimer, shownSeconds, startTimer,
-  ticksCrossed,
+  elapsedMs, endsAt, extendTimer, hasEnded, holdLengthMs, leadInLeftMs, nextSoundInMs, pauseTimer, remainingMs, resumeTimer,
+  shownSeconds, startTimer, ticksCrossed,
 } from './timers'
 
 const T0 = 1_760_000_000_000
@@ -64,9 +64,37 @@ describe('the 3-2-1 ticks', () => {
     expect(ticksCrossed(t, T0 + 5_000, T0 + 5_500)).toEqual([])
   })
 
+  // His report, 2026-11-25: the "3" and the "2" sounded together at 2 s.
+  it('a clock that skipped a second rings only the second just reached, never two at once', () => {
+    const t = startTimer('rest', 10_000, T0)
+    expect(ticksCrossed(t, T0 + 6_900, T0 + 8_100)).toEqual([2])
+    expect(ticksCrossed(t, T0 + 6_900, T0 + 8_300)).toHaveLength(1)
+  })
+
   it('a tick a hidden app missed is not played late', () => {
     const t = startTimer('rest', 10_000, T0)
     expect(ticksCrossed(t, T0 + 1_000, T0 + 9_500)).toEqual([])
+  })
+})
+
+describe('the time to the next beep or bell (2026-11-25)', () => {
+  it('is the time to the 3, then to each second, then to the end', () => {
+    const t = startTimer('rest', 10_000, T0)
+    expect(nextSoundInMs(t, 0, T0 + 5_000)).toBe(2_000)
+    expect(nextSoundInMs(t, 0, T0 + 7_500)).toBe(500)
+    expect(nextSoundInMs(t, 0, T0 + 9_600)).toBe(400)
+  })
+
+  it('is the slow start end first on a hold with a slow start', () => {
+    const t = startTimer('hold', 35_000, T0)
+    expect(nextSoundInMs(t, 5_000, T0 + 1_000)).toBe(4_000)
+    expect(nextSoundInMs(t, 5_000, T0 + 6_000)).toBe(26_000)
+  })
+
+  it('is none for a stopwatch, a paused timer and an ended one', () => {
+    expect(nextSoundInMs(startTimer('stopwatch', 0, T0), 0, T0 + 5_000)).toBeNull()
+    expect(nextSoundInMs(pauseTimer(startTimer('rest', 10_000, T0), T0 + 1_000), 0, T0 + 8_000)).toBeNull()
+    expect(nextSoundInMs(startTimer('rest', 10_000, T0), 0, T0 + 10_500)).toBeNull()
   })
 })
 

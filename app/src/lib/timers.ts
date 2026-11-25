@@ -78,13 +78,27 @@ export function shownSeconds(t: Timer, now: number): number {
   return t.kind === 'stopwatch' ? Math.floor(elapsedMs(t, now) / 1000) : Math.ceil(remainingMs(t, now) / 1000)
 }
 
-/** The 3-2-1 ticks crossed between two readings: each whole second of the last three that
- *  the countdown passed. A tick a hidden app missed is not played late. */
+/** The 3-2-1 tick crossed between two readings: the whole second of the last three that
+ *  the countdown just reached. When the clock skipped a second, only the second just
+ *  reached, so two beeps never sound as one (his report, 2026-11-25). A tick a hidden app
+ *  missed is not played late. */
 export function ticksCrossed(t: Timer, before: number, after: number): number[] {
   if (t.kind === 'stopwatch') return []
   const a = Math.ceil(remainingMs(t, before) / 1000)
   const b = Math.ceil(remainingMs(t, after) / 1000)
   const out: number[] = []
   for (let s = a - 1; s >= b && s >= 1; s--) if (s <= 3) out.push(s)
-  return after - before > 1500 ? [] : out
+  return after - before > 1500 ? [] : out.slice(-1)
+}
+
+/** The time from `now` to the next beep or bell a running countdown plays: the slow
+ *  start's end, each of the last three seconds, and the end. Null for a stopwatch, a
+ *  paused timer or one that has ended. The session screen wakes the sound this long ahead
+ *  (sounds.wakeAhead). */
+export function nextSoundInMs(t: Timer, leadMs: number, now: number): number | null {
+  if (t.kind === 'stopwatch' || !isRunning(t)) return null
+  const left = remainingMs(t, now)
+  if (left === 0) return null
+  const due = [leadInLeftMs(t, leadMs, now), left - 3000, left - 2000, left - 1000, left].filter((ms) => ms > 0)
+  return Math.min(...due)
 }

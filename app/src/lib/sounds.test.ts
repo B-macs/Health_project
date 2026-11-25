@@ -2,8 +2,8 @@
 // "Keep Spotify music and Apple Podcasts playing"). "playback" stops other audio on iOS.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  AUDIO_SESSION_TYPE, DEFAULT_SOUND_WAY, HELD_RELEASE_MS, RELEASE_AFTER_MS, audioReport, bell,
-  declareMixing, reportAudioOnce, restOver, setBells, setSoundLog, setSoundWay, tick, unlockAudio,
+  AUDIO_SESSION_TYPE, DEFAULT_SOUND_WAY, HELD_RELEASE_MS, RELEASE_AFTER_MS, WAKE_AHEAD_MS, audioReport, bell,
+  declareMixing, reportAudioOnce, restOver, setBells, setSoundLog, setSoundWay, tick, unlockAudio, wakeAhead,
 } from './sounds'
 import { DEFAULT_SETTINGS } from './settings'
 
@@ -284,5 +284,110 @@ describe('the headphone test ways (WP-42, his report of 2026-11-03)', () => {
   it('held is the way unless Settings says otherwise (his test with AirPods, 2026-11-09)', () => {
     expect(DEFAULT_SOUND_WAY).toBe('held')
     expect(DEFAULT_SETTINGS.soundWay).toBe('held')
+  })
+})
+
+// His report of 2026-11-25: "it's like the timer is not sounding on the 3 second but racing
+// through and sounding both at 2 seconds". On the iPhone a sound that was let go takes about
+// a second to start again; the fake phone below starts it after START_MS.
+describe('a slow start of the sound, as on the iPhone (2026-11-25)', () => {
+  const START_MS = 1200
+  class SlowContext {
+    static resumes = 0
+    static beeps = 0
+    state = 'suspended'
+    currentTime = 0
+    destination = {}
+    resume() {
+      SlowContext.resumes += 1
+      return new Promise<void>((done) => setTimeout(() => {
+        this.state = 'running'
+        done()
+      }, START_MS))
+    }
+    suspend() {
+      this.state = 'suspended'
+      return Promise.resolve()
+    }
+    close() {
+      return Promise.resolve()
+    }
+    createOscillator() {
+      return { connect() {}, start() { SlowContext.beeps += 1 }, stop() {}, type: '', frequency: { value: 0, setValueAtTime() {} } }
+    }
+    createGain() {
+      return { connect() {}, gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} } }
+    }
+  }
+
+  afterEach(() => {
+    setSoundWay(DEFAULT_SOUND_WAY)
+    setBells(false)
+    setBells(true)
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  /** The first tap has started the sound, and it has been let go again. */
+  const letGo = async (way: 'short' | 'held' = 'held') => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', { AudioContext: SlowContext })
+    setSoundWay(way)
+    unlockAudio({} as Navigator)
+    await vi.advanceTimersByTimeAsync(START_MS + HELD_RELEASE_MS)
+    expect(audioReport({} as Navigator).sound).toBe('suspended')
+    SlowContext.resumes = 0
+    SlowContext.beeps = 0
+  }
+
+  it('two beeps that wait for the same start never sound together: the late one is left out', async () => {
+    await letGo()
+    tick()                                        // the "3": the sound starts
+    await vi.advanceTimersByTimeAsync(1000)
+    tick()                                        // the "2", while the sound is still starting
+    await vi.advanceTimersByTimeAsync(START_MS)
+    expect(SlowContext.resumes).toBe(1)
+    expect(SlowContext.beeps).toBe(1)
+  })
+
+  it('held: the sound is woken ahead of the countdown, so the 3 plays on its second', async () => {
+    await letGo()
+    wakeAhead(WAKE_AHEAD_MS)
+    await vi.advanceTimersByTimeAsync(WAKE_AHEAD_MS)
+    tick()
+    expect(SlowContext.beeps).toBe(1)             // at once, no start to wait for
+    await vi.advanceTimersByTimeAsync(1000)
+    tick()
+    expect(SlowContext.beeps).toBe(2)
+    expect(SlowContext.resumes).toBe(1)
+  })
+
+  it('held: a wake ahead keeps the sound on until the beep it was woken for', async () => {
+    await letGo()
+    wakeAhead(WAKE_AHEAD_MS)
+    await vi.advanceTimersByTimeAsync(START_MS + 600)
+    expect(audioReport({} as Navigator).sound).toBe('running')
+  })
+
+  it('a bell is never left out, even when it waited for the start', async () => {
+    await letGo()
+    bell('finish')
+    await vi.advanceTimersByTimeAsync(START_MS)
+    expect(SlowContext.beeps).toBeGreaterThan(0)
+  })
+
+  it('no wake ahead before the first tap, and none in the short way', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', { AudioContext: SlowContext })
+    SlowContext.resumes = 0
+    wakeAhead(WAKE_AHEAD_MS)
+    await vi.advanceTimersByTimeAsync(START_MS)
+    expect(SlowContext.resumes).toBe(0)
+    setBells(false)
+    setBells(true)
+    await letGo('short')
+    wakeAhead(WAKE_AHEAD_MS)
+    await vi.advanceTimersByTimeAsync(START_MS)
+    expect(SlowContext.resumes).toBe(0)
   })
 })

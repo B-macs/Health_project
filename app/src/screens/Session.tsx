@@ -17,10 +17,10 @@ import { debugLog } from '../debug/console'
 import { alertFor, cancelAlert, scheduleAlert } from '../lib/alerts'
 import { api, ApiError } from '../lib/api'
 import { useApp } from '../lib/appState'
-import { bell, reportAudioOnce, restOver, tick, unlockAudio, type Ending } from '../lib/sounds'
+import { WAKE_AHEAD_MS, bell, reportAudioOnce, restOver, tick, unlockAudio, wakeAhead, type Ending } from '../lib/sounds'
 import {
   endsAt, extendTimer, hasEnded, holdLengthMs, isRunning, leadInLeftMs, pauseTimer, remainingMs, resumeTimer, shownSeconds,
-  startTimer, ticksCrossed, type Timer,
+  nextSoundInMs, startTimer, ticksCrossed, type Timer,
 } from '../lib/timers'
 import {
   advance, back, backTarget, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder, exerciseProgress, finished,
@@ -515,6 +515,10 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
     const leadMs = (ex.lead_in_seconds ?? 0) * 1000
     if (isRunning(t) && leadInLeftMs(t, leadMs, before) > 0 && leadInLeftMs(t, leadMs, now) === 0
       && now - before <= 1500) tick()
+    // Wake the sound before the next beep or bell, so the "3" plays on its second (his
+    // report, 2026-11-25: the "3" and the "2" sounded together at 2 s).
+    const ahead = nextSoundInMs(t, leadMs, now)
+    if (ahead !== null && ahead <= WAKE_AHEAD_MS && document.visibilityState === 'visible') wakeAhead(ahead)
     if (!isRunning(t) || !hasEnded(t, now) || handled.current === t) return
     handled.current = t
     const endedAt = endsAt(t) ?? now

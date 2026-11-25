@@ -42,6 +42,16 @@
 // stopped four times in 2.5 s at the end of a rest, and the music stopped at the second
 // and third beep; on "held" the music kept playing ("Tested and held worked"). "held" is
 // the way from then on (DEFAULT_SOUND_WAY); Settings › Bells still offers all three.
+//
+// His report of 2026-11-25: "The music stops again, I think because there is 2 beeps at the
+// start, it's like the timer is not sounding on the 3 second but racing through and sounding
+// both at 2 seconds". On the iPhone a sound that was let go takes up to about a second to
+// start again. The "3" waited for that start, the "2" came while it was still starting and
+// asked for a second start, and when the sound ran both beeps played at once. Three changes:
+// the "held" way wakes the sound WAKE_AHEAD_MS before a countdown's next beep or bell
+// (wakeAhead, called by the session screen), so the "3" plays on its second; there is never
+// more than one start at a time; and a beep that could only play more than TICK_LATE_MS late
+// is left out, so two beeps never sound as one. A bell is never left out.
 import {
   BELLS, PARTIALS, REST_OVER, TICK, partialSeconds, renderStrikes, renderTick, wav,
   type Ending, type Strike,
@@ -71,6 +81,13 @@ export const HELD_RELEASE_MS = 2500
 let way: SoundWay = DEFAULT_SOUND_WAY
 let releaseTimer: ReturnType<typeof setTimeout> | null = null
 let busyUntil = 0
+/** How long before a countdown's next beep or bell the "held" way wakes the sound: longer
+ *  than the iPhone takes to start a sound that was let go (about a second). */
+export const WAKE_AHEAD_MS = 2000
+/** A beep that could only play this long after it was due is left out. */
+export const TICK_LATE_MS = 300
+/** The start of the sound in progress: every sound waits for this one, never a second. */
+let waking: Promise<void> | null = null
 
 type SoundLog = (kind: string, detail: Record<string, unknown>) => void
 let soundLog: SoundLog | null = null
@@ -95,6 +112,7 @@ export function setBells(on: boolean): void {
   if (on) return
   unlocked = false
   busyUntil = 0
+  waking = null
   if (releaseTimer !== null) clearTimeout(releaseTimer)
   releaseTimer = null
   if (ctx) {
@@ -112,6 +130,7 @@ export function setSoundWay(next: SoundWay): void {
   const closing = ctx
   ctx = null
   unlocked = false
+  waking = null
   void closing.close().catch(() => undefined)
 }
 
@@ -188,12 +207,30 @@ export function reportAudioOnce(log: (detail: Record<string, unknown>) => void, 
   setTimeout(() => log({ at: 'a second later', ...audioReport(nav) }), 1000)
 }
 
+/** Start the sound that was let go: one start at a time, which every sound waits for. A
+ *  refused start still lets the sounds try. */
+function wake(c: Ctx, why: string): Promise<void> {
+  waking ??= c.resume().then(() => note(why, { sound: c.state }), () => undefined)
+    .finally(() => {
+      waking = null
+    })
+  return waking
+}
+
 /** Play one sound `seconds` long: wake the sound if it was let go, then let it go again
- *  after the sound ends. */
-function play(build: (c: Ctx, out: AudioNode) => void, seconds: number): void {
+ *  after the sound ends. A sound with `dropLateMs` is left out when it could only start
+ *  that much after it was due (a beep; never a bell). */
+function play(build: (c: Ctx, out: AudioNode) => void, seconds: number, dropLateMs: number | null = null): void {
   const c = context()
   if (!c) return
+  const due = Date.now()
   const go = () => {
+    const late = Date.now() - due
+    if (dropLateMs !== null && late > dropLateMs) {
+      note('a late beep was left out', { late_ms: late })
+      holdThenRelease(c, 0)
+      return
+    }
     try {
       build(c, c.destination)
     } catch {
@@ -201,14 +238,27 @@ function play(build: (c: Ctx, out: AudioNode) => void, seconds: number): void {
     }
     holdThenRelease(c, seconds)
   }
-  if (c.state === 'running') {
+  if (c.state === 'running' && waking === null) {
     go()
     return
   }
-  void c.resume().then(() => {
-    note('sound woken for a bell', { sound: c.state })
-    go()
-  }, go)
+  void wake(c, 'sound woken for a bell').then(go)
+}
+
+/** The "held" way: wake the sound before a countdown's next beep or bell, `ms` from now,
+ *  and keep it on until then, so the beep plays on its second (his report, 2026-11-25).
+ *  Only after the first tap has started the sound (iOS starts a sound from a tap first).
+ *  The "short" way keeps starting the sound at each beep, and the "file" way needs no
+ *  start. */
+export function wakeAhead(ms: number): void {
+  if (way !== 'held' || !unlocked || ms <= 0) return
+  const c = context()
+  if (!c) return
+  if (c.state === 'running' && waking === null) {
+    holdThenRelease(c, ms / 1000)
+    return
+  }
+  void wake(c, 'sound woken ahead of a beep').then(() => holdThenRelease(c, ms / 1000))
 }
 
 // ─── The "file" way (WP-42): the same sounds, played as WAV files ───────────────────
@@ -292,7 +342,7 @@ export function tick(): void {
     g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + TICK.seconds)
     o.start(c.currentTime)
     o.stop(c.currentTime + TICK.seconds)
-  }, TICK.seconds)
+  }, TICK.seconds, TICK_LATE_MS)
 }
 
 /** One struck-bell hit: mildly inharmonic partials, the higher ones decaying fastest. */
