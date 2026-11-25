@@ -172,19 +172,15 @@ describe('the Readiness and Strain screens', () => {
   })
 
   // The carried strain (the owner, 2026-11-12): the figure at the top, the day's own strain
-  // under it, and each day that adds to it.
-  it('strain: the carried strain leads, with the day itself and how it adds up', () => {
+  // under it. The sum that makes the figure is never shown (the owner, 2026-11-25:
+  // "Calculations are never show to the user").
+  it('strain: the carried strain leads, with the day itself, and no sum', () => {
     const d = fx.strainDetail(LOCAL, LOCAL, false)
     const html = text(draw(<DetailFrame heading={S.detail.strain} view={fresh(d)}>{(x) => <StrainBody d={x} onWeek={() => undefined} />}</DetailFrame>))
+    expect(html).toContain(d.masthead.display)
     expect(html).toContain(S.detail.strainOwn(d.today!.display, d.today!.label))
-    expect(html).toContain(S.detail.carry)
-    expect(html).toContain(S.detail.carryIntro(0.5))
-    expect(html).toContain(S.detail.carryRow('6.0', S.detail.carryShare(0.5), '3.0'))
-    expect(html).toContain(S.detail.carryRow(d.carry!.days[0]!.strain.toFixed(1), 'in full', d.carry!.days[0]!.carried.toFixed(1)))
-    expect(S.detail.carryShare(0.125)).toBe('× 1/8')
-    const none = { ...d, carry: { per_day: 0.5, days: [] } }
-    expect(text(draw(<DetailFrame heading={S.detail.strain} view={fresh(none)}>{(x) => <StrainBody d={x} onWeek={() => undefined} />}</DetailFrame>)))
-      .toContain(S.detail.carryNone)
+    expect(html).not.toContain(' = ')
+    expect(html).not.toContain('×')
   })
 
   it('strain: the card says how the number was measured, and lists no exercise without a body area', () => {
@@ -192,13 +188,12 @@ describe('the Readiness and Strain screens', () => {
     const d = {
       ...base,
       region: base.region && { ...base.region, unmapped_names: ['Made-up pose'] },
-      source: { kind: 'hr', label: 'Made-up method', hr_rows: [{ label: 'Average heart rate', value: '119 bpm' }],
-        blend: { hr_strain: 16.4, rpe_strain: 16.2, hr_weight_pct: 70 } },
+      source: { kind: 'hr', label: 'Made-up method', hr_rows: [{ label: 'Average heart rate', value: '119 bpm' }] },
     }
     const html = text(draw(<DetailFrame heading={S.detail.strain} view={fresh(d)}>{(x) => <StrainBody d={x} onWeek={() => undefined} />}</DetailFrame>))
     expect(html).toContain(S.detail.source)
     expect(html).toContain('Average heart rate')
-    expect(html).toContain(S.detail.blend(70, 16.4, 16.2))
+    expect(html).not.toContain('from your heart rate')
     expect(html).not.toContain('Made-up pose')
   })
 

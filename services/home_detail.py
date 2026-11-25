@@ -450,21 +450,15 @@ def strain_detail(repo, requested: date | None, caller_today: date, show_week: b
                              data, show_week)
     source = strain_screen.strain_source(snap)
     if source is not None:
-        hr_strain, rpe_strain, hr_weight = source["blend"] or (None, None, None)
+        # Never the split into its heart-rate and rating parts (2026-11-25).
         source = {"kind": source["kind"], "label": source["label"],
-                  "hr_rows": [{"label": n, "value": v} for n, v in source["hr_rows"]],
-                  "blend": (None if source["blend"] is None else
-                            {"hr_strain": hr_strain, "rpe_strain": rpe_strain,
-                             "hr_weight_pct": hr_weight})}
+                  "hr_rows": [{"label": n, "value": v} for n, v in source["hr_rows"]]}
     return {
         **_frame("strain", day, before, after, caller_today),
         "title": title,
         "masthead": {"colour": colour, "display": display, "label": band},
         "is_rolling": is_rolling,
         "today": {"value": snap["strain"], "display": own_display, "label": own_band},
-        "carry": (None if snap.get("strain_carried") is None else
-                  {"per_day": dash.STRAIN_CARRY_PER_DAY,
-                   "days": list(snap.get("strain_carried_days") or [])}),
         "bio_failed": reads.bio_failed,
         "stage_unread": home.STAGE_UNREAD if reads.stage is None else "",
         "region": region,

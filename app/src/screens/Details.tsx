@@ -13,7 +13,6 @@ import { useEffect, useState } from 'react'
 import type { components } from '../generated/api'
 import { useApp } from '../lib/appState'
 import { useCached } from '../lib/cache'
-import { shortDate } from '../lib/dates'
 import { dayPath } from '../lib/day'
 import { enqueue } from '../lib/outbox'
 import { S } from '../strings'
@@ -252,32 +251,6 @@ function Source({ source }: { source: NonNullable<Schemas['StrainSource']> }) {
       {source.hr_rows.map((row) => (
         <div key={row.label} className="kv"><span className="caption">{row.label}</span><span>{row.value}</span></div>
       ))}
-      {source.blend && (
-        <p className="caption">{S.detail.blend(source.blend.hr_weight_pct, source.blend.hr_strain, source.blend.rpe_strain)}</p>
-      )}
-    </Section>
-  )
-}
-
-/** How the carried strain at the top adds up (2026-11-12): each day of the last two weeks
- *  that carried strain, its own strain, the share still carried, and that part. */
-function Carry({ carry, total }: { carry: NonNullable<StrainDetail['carry']>; total: string }) {
-  return (
-    <Section title={S.detail.carry} testId="strain-carry">
-      {carry.days.length === 0 ? <p className="caption">{S.detail.carryNone}</p> : (
-        <>
-          <p className="caption">{S.detail.carryIntro(carry.per_day)}</p>
-          <ul className="list">
-            {carry.days.map((c) => (
-              <li key={c.date} className="kv">
-                <span>{shortDate(c.date)}</span>
-                <span className="num">{S.detail.carryRow(c.strain.toFixed(1), S.detail.carryShare(c.share), c.carried.toFixed(1))}</span>
-              </li>
-            ))}
-            <li className="kv"><b>{S.detail.carryTotal}</b><b className="num">{total}</b></li>
-          </ul>
-        </>
-      )}
     </Section>
   )
 }
@@ -286,7 +259,6 @@ export function StrainBody({ d, onWeek }: { d: StrainDetail; onWeek: (week: bool
   return (
     <>
       {d.today && <p className="caption" data-testid="strain-own">{S.detail.strainOwn(d.today.display, d.today.label)}</p>}
-      {d.carry && <Carry carry={d.carry} total={d.masthead.display} />}
       {d.stage_unread && <p className="caption">{d.stage_unread}</p>}
       {d.region && <Regions panel={d.region} onWeek={onWeek} />}
       {d.source && <Source source={d.source} />}

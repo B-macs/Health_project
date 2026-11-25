@@ -92,22 +92,6 @@ class StrainDayOwn(BaseModel):
     label: str
 
 
-class StrainCarriedDay(BaseModel):
-    """One day that adds to the carried strain: its own strain, the share of it
-    still carried on the day shown, and that part."""
-    date: date
-    strain: float
-    share: float
-    carried: float
-
-
-class StrainCarry(BaseModel):
-    """How the carried strain adds up (2026-11-12): the share carried from one
-    day to the next, and each day that carried any strain, newest first."""
-    per_day: float
-    days: list[StrainCarriedDay]
-
-
 class StrainCardOut(Band):
     #: The strain carried into the day (2026-11-12): today's own strain plus each
     #: earlier day's, halved for each day back (dashboard.carried_strain).
@@ -445,24 +429,20 @@ class RegionPanel(BaseModel):
     non_additive_note: str | None = None
 
 
-class StrainBlend(BaseModel):
-    hr_strain: float
-    rpe_strain: float
-    hr_weight_pct: int
-
-
 class StrainSource(BaseModel):
+    """How a day's strain was measured, in words and readings. The split of the
+    figure into its heart-rate and rating parts is not sent (the owner,
+    2026-11-25: "Calculations are never show to the user"); the label names both
+    sources."""
     kind: str
     label: str
     hr_rows: list[LabelValue]
-    blend: StrainBlend | None
 
 
 class StrainDetailOut(DetailFrame):
     is_rolling: bool
     #: The day's own strain, under the carried figure of the masthead (2026-11-12).
     today: StrainDayOwn | None = None
-    carry: StrainCarry | None = None
     #: Why there is no region panel: the stage could not be read (F7).
     stage_unread: str
     region: RegionPanel | None

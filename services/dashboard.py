@@ -112,34 +112,45 @@ def rolling_prior_strain(au_rows: list[dict], stage: int, today: date | None = N
 #: fit his own rate later, from the check-in's tiredness and the heart rate of
 #: the same exercise at the same load (chest-strap sessions only).
 STRAIN_CARRY_PER_DAY = 0.5
-#: Days read back for the carried strain, today included. At half per day the
-#: oldest counts 1/8192 of its strain.
-STRAIN_CARRY_DAYS = 14
+#: The highest strain a day can have, and the smallest part the screen can
+#: show: the figure is to one decimal, so a part under 0.05 reads 0.0.
+STRAIN_DAY_MAX = 21.0
+STRAIN_SHOWN_STEP = 0.05
+
+
+def carry_days(per_day: float) -> int:
+    """Days read back for the carried strain, today included: a day counts only
+    while its part can still show, at the highest strain a day can have. The
+    owner, 2026-11-25, of the 14 days read until then: *"the final 3
+    calculations wil always be 0, if you divide a max number of 21 by 512 you
+    ll never get anything more than 0.04"*. At half per day this is 9 days:
+    the oldest counts 1/256 (at most 0.08), and the days left out could add at
+    most 0.08 together."""
+    days = 1
+    while STRAIN_DAY_MAX * per_day ** days >= STRAIN_SHOWN_STEP:
+        days += 1
+    return days
+
+
+STRAIN_CARRY_DAYS = carry_days(STRAIN_CARRY_PER_DAY)
 
 
 def carried_strain(au_rows: list[dict], stage: int, today: date,
                    hr_rows: list[dict] | None = None,
-                   walks: dict[str, list[dict]] | None = None) -> dict:
+                   walks: dict[str, list[dict]] | None = None) -> float:
     """The strain carried into `today` (the owner, 2026-11-12: *"I want to see
     accumulate strain each day not the strain of just that day"*): today's own
     strain plus each earlier day's, each day back counting STRAIN_CARRY_PER_DAY
-    as much as the day after it. Each day's strain is the figure its own card
-    shows (day_strain); a day with nothing counts 0.
+    as much as the day after it, to one decimal. Each day's strain is the
+    figure its own card shows (day_strain); a day with nothing counts 0.
 
-    {"value": the sum to one decimal, "days": the days that carried any
-    strain, newest first, each {"date", "strain", "share", "carried"}}.
-    Display only: the stored strain, the load ratio and every training
-    decision read the day's own load (Key Rule 2b)."""
-    days, total = [], 0.0
-    for k in range(STRAIN_CARRY_DAYS):
-        d = today - timedelta(days=k)
-        own = day_strain(d.isoformat(), au_rows, stage, hr_rows, walks)["strain"] or 0.0
-        share = STRAIN_CARRY_PER_DAY ** k
-        total += own * share
-        if own > 0:
-            days.append({"date": d, "strain": round(own, 1), "share": share,
-                         "carried": round(own * share, 1)})
-    return {"value": round(total, 1), "days": days}
+    Only the figure goes to the screen, never the sum that makes it (the
+    owner, 2026-11-25: *"Calculations are never show to the user"*). Display
+    only: the stored strain, the load ratio and every training decision read
+    the day's own load (Key Rule 2b)."""
+    return round(sum((day_strain((today - timedelta(days=k)).isoformat(), au_rows,
+                                 stage, hr_rows, walks)["strain"] or 0.0)
+                     * STRAIN_CARRY_PER_DAY ** k for k in range(STRAIN_CARRY_DAYS)), 1)
 
 
 def carried_from_daily(daily: dict[str, float | None], day: date) -> float:

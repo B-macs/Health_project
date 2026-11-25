@@ -3500,15 +3500,6 @@ export interface components {
             /** Stored */
             stored: boolean;
         };
-        /** StrainBlend */
-        StrainBlend: {
-            /** Hr Strain */
-            hr_strain: number;
-            /** Hr Weight Pct */
-            hr_weight_pct: number;
-            /** Rpe Strain */
-            rpe_strain: number;
-        };
         /** StrainCardOut */
         StrainCardOut: {
             /** Card Label */
@@ -3541,35 +3532,6 @@ export interface components {
             value: number | null;
         };
         /**
-         * StrainCarriedDay
-         * @description One day that adds to the carried strain: its own strain, the share of it
-         *     still carried on the day shown, and that part.
-         */
-        StrainCarriedDay: {
-            /** Carried */
-            carried: number;
-            /**
-             * Date
-             * Format: date
-             */
-            date: string;
-            /** Share */
-            share: number;
-            /** Strain */
-            strain: number;
-        };
-        /**
-         * StrainCarry
-         * @description How the carried strain adds up (2026-11-12): the share carried from one
-         *     day to the next, and each day that carried any strain, newest first.
-         */
-        StrainCarry: {
-            /** Days */
-            days: components["schemas"]["StrainCarriedDay"][];
-            /** Per Day */
-            per_day: number;
-        };
-        /**
          * StrainDayOwn
          * @description The day's own strain (its sessions and walks), and its band ("Rest" on a
          *     day with no session): the card's second line since 2026-11-12.
@@ -3586,7 +3548,6 @@ export interface components {
         StrainDetailOut: {
             /** Bio Failed */
             bio_failed: boolean;
-            carry?: components["schemas"]["StrainCarry"] | null;
             /**
              * Date
              * Format: date
@@ -3619,9 +3580,14 @@ export interface components {
             today?: components["schemas"]["StrainDayOwn"] | null;
             trend: components["schemas"]["TrendChart"];
         };
-        /** StrainSource */
+        /**
+         * StrainSource
+         * @description How a day's strain was measured, in words and readings. The split of the
+         *     figure into its heart-rate and rating parts is not sent (the owner,
+         *     2026-11-25: "Calculations are never show to the user"); the label names both
+         *     sources.
+         */
         StrainSource: {
-            blend: components["schemas"]["StrainBlend"] | null;
             /** Hr Rows */
             hr_rows: components["schemas"]["LabelValue"][];
             /** Kind */

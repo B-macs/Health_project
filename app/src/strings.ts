@@ -94,16 +94,9 @@ export const S = {
     showWeek: "Show the week's shape",
     hideWeek: 'Hide the week',
     source: 'How this strain was measured',
-    blend: (pct: number, hr: number, rpe: number) => `Strain is ${pct}% from your heart rate (${hr.toFixed(1)}) and the rest from your session rating (${rpe.toFixed(1)}).`,
-    // The carried strain (2026-11-12): the figure at the top, and how it adds up.
+    // The carried strain (2026-11-12) is the figure at the top. The sum that makes it is
+    // never shown (the owner, 2026-11-25: "Calculations are never show to the user").
     strainOwn: (display: string, label: string) => `This day's own strain: ${display} · ${label}`,
-    carry: 'How the carried strain adds up',
-    carryIntro: (perDay: number) =>
-      `Each day's own strain counts in full on that day, then ${perDay === 0.5 ? 'half' : `${Math.round(perDay * 100)}%`} as much on each day after. These days of the last two weeks carry strain into this day:`,
-    carryShare: (share: number) => (share >= 1 ? 'in full' : share === 0.5 ? '× ½' : `× 1/${Math.round(1 / share)}`),
-    carryRow: (strain: string, share: string, carried: string) => `${strain} ${share} = ${carried}`,
-    carryNone: 'No strain in the last two weeks.',
-    carryTotal: 'Carried strain',
   },
   charts: {
     empty: 'Not enough readings for a chart in this period.',
@@ -570,7 +563,7 @@ export const S = {
     outdoorEffort: 'How hard was it?',
     outdoorEffortHelp: 'Your rating sets the load, as for every gym session. The average heart rate above is context.',
     outdoorPreview: (name: string, date: string, minutes: number, rpe: number, au: number) =>
-      `Logs as ${name} on ${date}: ${minutes} min × effort ${rpe} = load ${Math.round(au)}, into strain and the load ratio. It counts as a leg day, and never marks a plan day as done.`,
+      `Logs as ${name} on ${date}: ${minutes} min, load ${Math.round(au)}, into strain and the load ratio. It counts as a leg day, and never marks a plan day as done.`,
     logTo: (name: string) => `Log to training: ${name}`,
     outdoorLogged: (name: string, date: string, au: number) => `${name} on ${date} logged: load ${Math.round(au)}.`,
     outdoorAlready: (name: string, date: string) => `${name} on ${date} is already logged.`,
@@ -644,7 +637,7 @@ export const S = {
       rough: 'Rough match.',
     } as Record<string, string>,
     liftsNone: 'No lift this year has a 2025 lift to set it against yet.',
-    liftsHow: 'One-rep max from each best set, worked out the same way for both years: weight × (1 + (reps + 1) ÷ 30). Lifts with no 2025 match, such as the machines, are not listed.',
+    liftsHow: 'One-rep max from each best set, worked out the same way for both years. Lifts with no 2025 match, such as the machines, are not listed.',
     volume: 'Training volume',
     kg: (v: number) => `${Math.round(v).toLocaleString('en-GB')} kg`,
     lastFullWeek: (label: string) => (label ? `Last full week · ${label}` : 'Last full week'),
@@ -857,7 +850,7 @@ export const S = {
     ceiling: 'Stage ceiling',
     auChart: 'Daily session AU, last 28 days: the last 7 are the acute window',
     volume: 'Weekly volume load',
-    volumeWhy: 'Total kg moved (reps × weight) per week from Monday. It counts only loaded exercises with countable reps, and sits beside ACWR, which reads session RPE × duration.',
+    volumeWhy: 'Total kg moved per week from Monday. It counts only loaded exercises with countable reps, and sits beside ACWR, which reads the rating and length of each session.',
     volumeChart: 'Kilograms moved per week, last 8 weeks',
     noVolume: 'No logged volume yet for loaded, countable-reps exercises in the last 8 weeks.',
   },

@@ -324,7 +324,9 @@ def test_strain_detail_names_the_regions_and_the_stage_ceiling(monkeypatch):
     assert trend["title"] == home_detail.CARRIED_TREND[1]
     assert trend["headline"] == body["masthead"]["display"]
     assert trend["axis"]["hi"] >= max(v for v in trend["values"] if v is not None)
-    assert body["carry"]["per_day"] == 0.5
+    # 2026-11-25 (the owner: "Calculations are never show to the user"): the answer
+    # carries the figure only, never the days and shares that make it.
+    assert "carry" not in body
 
 
 def test_the_region_acwr_starts_at_the_stage_active_on_the_day_shown(monkeypatch):

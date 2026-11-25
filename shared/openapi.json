@@ -7365,29 +7365,6 @@
         "title": "StoredOut",
         "type": "object"
       },
-      "StrainBlend": {
-        "properties": {
-          "hr_strain": {
-            "title": "Hr Strain",
-            "type": "number"
-          },
-          "hr_weight_pct": {
-            "title": "Hr Weight Pct",
-            "type": "integer"
-          },
-          "rpe_strain": {
-            "title": "Rpe Strain",
-            "type": "number"
-          }
-        },
-        "required": [
-          "hr_strain",
-          "rpe_strain",
-          "hr_weight_pct"
-        ],
-        "title": "StrainBlend",
-        "type": "object"
-      },
       "StrainCardOut": {
         "properties": {
           "card_label": {
@@ -7479,58 +7456,6 @@
         "title": "StrainCardOut",
         "type": "object"
       },
-      "StrainCarriedDay": {
-        "description": "One day that adds to the carried strain: its own strain, the share of it\nstill carried on the day shown, and that part.",
-        "properties": {
-          "carried": {
-            "title": "Carried",
-            "type": "number"
-          },
-          "date": {
-            "format": "date",
-            "title": "Date",
-            "type": "string"
-          },
-          "share": {
-            "title": "Share",
-            "type": "number"
-          },
-          "strain": {
-            "title": "Strain",
-            "type": "number"
-          }
-        },
-        "required": [
-          "date",
-          "strain",
-          "share",
-          "carried"
-        ],
-        "title": "StrainCarriedDay",
-        "type": "object"
-      },
-      "StrainCarry": {
-        "description": "How the carried strain adds up (2026-11-12): the share carried from one\nday to the next, and each day that carried any strain, newest first.",
-        "properties": {
-          "days": {
-            "items": {
-              "$ref": "#/components/schemas/StrainCarriedDay"
-            },
-            "title": "Days",
-            "type": "array"
-          },
-          "per_day": {
-            "title": "Per Day",
-            "type": "number"
-          }
-        },
-        "required": [
-          "per_day",
-          "days"
-        ],
-        "title": "StrainCarry",
-        "type": "object"
-      },
       "StrainDayOwn": {
         "description": "The day's own strain (its sessions and walks), and its band (\"Rest\" on a\nday with no session): the card's second line since 2026-11-12.",
         "properties": {
@@ -7567,16 +7492,6 @@
           "bio_failed": {
             "title": "Bio Failed",
             "type": "boolean"
-          },
-          "carry": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StrainCarry"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "date": {
             "format": "date",
@@ -7689,17 +7604,8 @@
         "type": "object"
       },
       "StrainSource": {
+        "description": "How a day's strain was measured, in words and readings. The split of the\nfigure into its heart-rate and rating parts is not sent (the owner,\n2026-11-25: \"Calculations are never show to the user\"); the label names both\nsources.",
         "properties": {
-          "blend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/StrainBlend"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "hr_rows": {
             "items": {
               "$ref": "#/components/schemas/LabelValue"
@@ -7719,8 +7625,7 @@
         "required": [
           "kind",
           "label",
-          "hr_rows",
-          "blend"
+          "hr_rows"
         ],
         "title": "StrainSource",
         "type": "object"

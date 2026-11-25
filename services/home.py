@@ -125,11 +125,9 @@ def snapshot(reads: HomeReads) -> dict:
     # The strain carried into the day (2026-11-12), the Strain card's figure. Beside
     # the day snapshot, not in it: that snapshot's keys are what Metrics History
     # stores, and the carried figure is display only.
-    carried = ({"value": None, "days": []} if reads.stage is None else
-               dash.carried_strain(reads.au_rows, reads.stage, reads.day,
-                                   hr_rows=reads.hr_rows, walks=reads.walks))
-    snap["strain_carried"] = carried["value"]
-    snap["strain_carried_days"] = carried["days"]
+    snap["strain_carried"] = (None if reads.stage is None else
+                              dash.carried_strain(reads.au_rows, reads.stage, reads.day,
+                                                  hr_rows=reads.hr_rows, walks=reads.walks))
     return snap
 
 

@@ -989,13 +989,14 @@ def ts_string_literals(text: str) -> list[str]:
 
 def text_rule_hits(literals: list[str]) -> list[str]:
     """Strings that fail the screen-text scanners already in tests/: the jargon, the
-    repo-internal and the hedge lists (Key Rule 19, the patient-facing text rules), and
-    no Stage 1 text."""
+    repo-internal and the hedge lists (Key Rule 19, the patient-facing text rules), no
+    Stage 1 text, and no calculation (the owner, 2026-11-25)."""
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
     from tests.test_cluster_a import _HEDGES, _JARGON, _REPO_INTERNALS
+    from tests.test_no_calculation_on_screen import calculation_hits
     from tests.test_no_stage_one_on_screen import _STAGE_ONE
-    hits = []
+    hits = calculation_hits(literals)
     for text in literals:
         low = text.lower()
         hits += [f"{word!r} in {text[:48]!r}" for word in (*_JARGON, *_REPO_INTERNALS, *_HEDGES)

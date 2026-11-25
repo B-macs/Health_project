@@ -112,7 +112,7 @@ def test_the_strain_source_is_named_or_nothing_is_said():
     assert rows["Zone 1, very easy (93-112 bpm)"] == "20 min"
     assert rows["Zone 2, easy (112-130 bpm)"] == "14 min"
     assert rows["Zone 5, very hard (167-186 bpm)"] == "0 min"
-    assert rows["Heart-rate load (minutes × zone number)"] == "96"
+    assert rows["Heart-rate load"] == "96", "the figure, never its formula (2026-11-25)"
     assert rows["Zones use your top heart rate"] == "186 bpm"
     assert not any("TRIMP" in name or "Edwards" in name for name in rows)
     assert hr["blend"] == (11.8, 10.9, int(hr_load.HR_BLEND_WEIGHT * 100))

@@ -3,8 +3,9 @@ day not the strain of just that day"*; his choices: carried over and fading, hal
 day, the same arc and words).
 
 The Strain card and screen lead with the strain carried into the day: today's own
-strain plus each earlier day's, halved for each day back. The day's own strain is the
-second line. Display only: Metrics History stores the day's own strain, and the load
+strain plus each earlier day's, halved for each day back, over the days whose part can
+still show (2026-11-25). The day's own strain is the second line; the sum that makes the
+figure is never shown (the owner, 2026-11-25). Display only: Metrics History stores the day's own strain, and the load
 ratio reads the day's own load (Key Rule 2b)."""
 
 from __future__ import annotations
@@ -21,9 +22,9 @@ def _days_back(k: int) -> str:
     return (THU - timedelta(days=k)).isoformat()
 
 
-def test_the_rate_is_half_per_day_over_fourteen_days():
+def test_the_rate_is_half_per_day_over_nine_days():
     assert dash.STRAIN_CARRY_PER_DAY == 0.5
-    assert dash.STRAIN_CARRY_DAYS == 14
+    assert dash.STRAIN_CARRY_DAYS == 9
 
 
 def test_his_week_carries_into_a_rest_day():
@@ -35,24 +36,37 @@ def test_his_week_carries_into_a_rest_day():
         "today's own strain counts in full"
 
 
-def test_the_carry_stops_after_fourteen_days():
-    assert dash.carried_from_daily({_days_back(13): 16.0}, THU) == 0.0   # 16 / 8192
-    assert dash.carried_from_daily({_days_back(14): 16_000.0}, THU) == 0.0
+def test_a_day_counts_only_while_its_part_can_still_show():
+    # The owner, 2026-11-25: "if you divide a max number of 21 by 512 you ll never get
+    # anything more than 0.04". The oldest day counted can still show at 21.
+    assert dash.carried_from_daily({_days_back(8): 21.0}, THU) == 0.1     # 21 / 256
+    assert dash.carried_from_daily({_days_back(9): 21_000.0}, THU) == 0.0, "not counted"
+    for k in range(dash.STRAIN_CARRY_DAYS):
+        assert round(dash.STRAIN_DAY_MAX * dash.STRAIN_CARRY_PER_DAY ** k, 1) >= 0.1
+    assert round(dash.STRAIN_DAY_MAX * dash.STRAIN_CARRY_PER_DAY ** dash.STRAIN_CARRY_DAYS, 1) == 0.0
+
+
+def test_the_days_left_out_add_less_than_one_step_together():
+    left_out = sum(dash.STRAIN_DAY_MAX * dash.STRAIN_CARRY_PER_DAY ** k
+                   for k in range(dash.STRAIN_CARRY_DAYS, 60))
+    assert left_out < 0.1
+
+
+def test_the_window_follows_the_rate():
+    # When he fits his own rate, the days counted follow it.
+    assert dash.carry_days(0.5) == 9
+    assert dash.carry_days(0.25) < dash.carry_days(0.5) < dash.carry_days(0.7)
 
 
 def test_carried_strain_adds_each_days_own_strain_at_its_share():
     au = [{"date": _days_back(1), "total_au": 400.0}, {"date": _days_back(3), "total_au": 300.0}]
-    out = dash.carried_strain(au, 2, THU)
     yesterday = dash.day_strain(_days_back(1), au, 2)["strain"]
     three_back = dash.day_strain(_days_back(3), au, 2)["strain"]
-    assert out["value"] == round(yesterday / 2 + three_back / 8, 1)
-    assert [(d["date"], d["share"]) for d in out["days"]] == [
-        (THU - timedelta(days=1), 0.5), (THU - timedelta(days=3), 0.125)], "newest first"
-    assert out["days"][0]["carried"] == round(yesterday / 2, 1)
+    assert dash.carried_strain(au, 2, THU) == round(yesterday / 2 + three_back / 8, 1)
 
 
-def test_nothing_in_fourteen_days_carries_nothing():
-    assert dash.carried_strain([], 2, THU) == {"value": 0.0, "days": []}
+def test_nothing_in_the_days_counted_carries_nothing():
+    assert dash.carried_strain([], 2, THU) == 0.0
 
 
 def test_the_carried_words_use_the_strain_bands():
@@ -78,9 +92,9 @@ def test_the_home_snapshot_carries_and_says_what_it_carries():
     snap = home.snapshot(_reads(au))
     assert snap["strain"] == 0.0
     assert snap["strain_carried"] == round(dash.day_strain(_days_back(1), au, 2)["strain"] / 2, 1)
-    assert [d["date"] for d in snap["strain_carried_days"]] == [THU - timedelta(days=1)]
+    assert "strain_carried_days" not in snap, "only the figure, never the sum that makes it"
 
 
 def test_no_stage_carries_nothing():
     snap = home.snapshot(_reads([{"date": _days_back(1), "total_au": 400.0}], stage=None))
-    assert snap["strain_carried"] is None and snap["strain_carried_days"] == []
+    assert snap["strain_carried"] is None

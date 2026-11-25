@@ -175,7 +175,7 @@ def strain_source(snapshot: dict) -> dict | None:
             ("Highest heart rate", _bpm(hr.get("max_hr"))),
             *[(_zone_name(z, hr_max), _zone_minutes(minutes.get(z)))
               for z in sorted(hr_load.ZONE_LOWER_PCT)],
-            ("Heart-rate load (minutes × zone number)",
+            ("Heart-rate load",
              "—" if load in (None, "") else f"{float(load):.0f}"),
         ]
         if hr_max:

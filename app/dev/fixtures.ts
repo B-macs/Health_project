@@ -214,9 +214,7 @@ export function strainDetail(day: string, local: string, showWeek: boolean): Sch
   return {
     ...frame(day, local), title: `STRAIN · ${frame(day, local).date_label}`, screen_title: 'Strain History', is_rolling: false, stage_unread: '',
     masthead: { colour: '', display: (t + 3).toFixed(1), label: t + 3 < 8 ? 'Light' : 'Moderate' },
-    // The carried strain (2026-11-12): made up, the day shown and the day before.
     today: { value: t, display: t.toFixed(1), label: t < 8 ? 'Light' : 'Moderate' },
-    carry: { per_day: 0.5, days: [{ date: day, strain: t, share: 1, carried: t }, { date: addDays(day, -1), strain: 6, share: 0.5, carried: 3 }] },
     region: {
       state: 'split', reason: null, can_show_window: true, showing_week: showWeek, week: showWeek, ceiling: null, mapped_only: true,
       non_additive_note: null, overall: t, regions_total: t, shares_basis: null, shares_version: 1, stage: 2, thin_sample_pct: null,
@@ -227,7 +225,7 @@ export function strainDetail(day: string, local: string, showWeek: boolean): Sch
         { id: 'lower_body', name: 'Lower body', short: 'Lower', strain: 8.3, au: 160, au_pct: 50, fill_pct: 60, colour: '', acwr: null },
       ],
     },
-    source: { kind: 'rpe', label: 'Your session rating only: the watch had no heart rate for this session', hr_rows: [], blend: null },
+    source: { kind: 'rpe', label: 'Your session rating only: the watch had no heart rate for this session', hr_rows: [] },
     hrv_7d: trend(day, 'HRV', () => 44),
     rhr_7d: trend(day, 'Resting heart rate', () => 54),
     trend: trend(day, 'Strain', strainOf),
